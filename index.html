@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Australian Road Safety Enforcement · BITRE Data Explorer</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css" />
+
+    <!-- D3 -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"
+      defer
+    ></script>
+
+    <!-- App scripts (load order matters) -->
+    <script src="js/data.js" defer></script>
+    <script src="js/config.js" defer></script>
+    <script src="js/tooltip.js" defer></script>
+    <script src="js/charts.js" defer></script>
+    <script src="js/main.js" defer></script>
+  </head>
+  <body>
+    <!-- ── HEADER ──────────────────────────────────────────────── -->
+    <header>
+      <div class="header-eyebrow">
+        BITRE · Road Safety Enforcement Data 2008–2024
+      </div>
+      <h1>On Australian Roads<br /><em>Who gets fined, where, and why?</em></h1>
+      <div class="header-meta">
+        <div class="stat-pill">
+          <span class="num" id="total-fines">—</span>
+          <span class="label">Total Fines</span>
+        </div>
+        <div class="stat-pill">
+          <span class="num" id="total-arrests">—</span>
+          <span class="label">Arrests</span>
+        </div>
+        <div class="stat-pill">
+          <span class="num" id="total-charges">—</span>
+          <span class="label">Charges</span>
+        </div>
+        <div class="stat-pill">
+          <span class="num">8</span>
+          <span class="label">Jurisdictions</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── DATA FILTERS ─────────────────────────────────────────── -->
+    <details class="filter-panel" id="data-filters">
+      <summary class="filter-panel-summary">Filter dataset</summary>
+      <div class="filter-panel-body">
+        <p class="filter-hint">
+          <strong>Year / Age:</strong> use a range (from–to) or switch to specific
+          years or age bands. <strong>Other fields:</strong> tick any combination
+          of jurisdictions, locations, offences, and detection types. All choices
+          combine (AND). Defaults include everything.
+        </p>
+        <div class="filter-grid" id="filter-grid"></div>
+        <div class="filter-actions">
+          <button type="button" class="filter-clear-btn" id="filter-clear">
+            Clear all filters
+          </button>
+          <span class="filter-count" id="filter-count"></span>
+        </div>
+      </div>
+    </details>
+
+    <!-- ── NAV ─────────────────────────────────────────────────── -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="story">Story</button>
+      <button class="tab-btn" data-tab="trends">Trends</button>
+      <button class="tab-btn" data-tab="breakdown">Age &amp; Location</button>
+      <button class="tab-btn" data-tab="jurisdiction">By State</button>
+    </nav>
+
+    <!-- ── MAIN ─────────────────────────────────────────────────── -->
+    <main>
+      <!-- STORY TAB -->
+      <div class="section active" id="tab-story">
+        <div class="story-header">
+          <h2>Speed dominates, but the real story is in the details.</h2>
+          <p>
+            Over 16 years of road enforcement data from all Australian
+            jurisdictions reveals clear patterns: who breaks the rules, where
+            enforcement is concentrated, and how technology is reshaping
+            detection.
+          </p>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card chart-full">
+            <h3>Overview</h3>
+            <div class="chart-title">Total Fines by Offence Type</div>
+            <svg id="story-bar" height="180"></svg>
+            <div class="legend" id="story-bar-legend"></div>
+          </div>
+
+          <div class="chart-card chart-full">
+            <h3>Enforcement Over Time</h3>
+            <div class="chart-title">Annual Fines Trend — All Offences</div>
+            <svg id="story-trend" height="260"></svg>
+            <div class="legend" id="story-trend-legend"></div>
+          </div>
+        </div>
+
+        <div class="insight">
+          <div class="insight-label">Key Finding</div>
+          <p>
+            <strong>Speeding accounts for over 93% of all fines</strong>
+            recorded from 2008 to 2024. Camera-based detection dramatically
+            increased enforcement output from 2015 onward. Meanwhile, mobile
+            phone use fines surged as smartphone adoption grew — and
+            camera-based enforcement began in certain states from 2019.
+          </p>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card">
+            <h3>Detection Method</h3>
+            <div class="chart-title">How Fines Are Issued</div>
+            <svg id="story-detection" height="220"></svg>
+          </div>
+          <div class="chart-card">
+            <h3>Age Group Profile</h3>
+            <div class="chart-title">Offence Distribution by Age</div>
+            <svg id="story-youth" height="220"></svg>
+          </div>
+        </div>
+
+        <div class="insight">
+          <div class="insight-label">Young Driver Insight</div>
+          <p>
+            Drivers aged
+            <strong
+              >17–25 show disproportionately high rates of unlicensed driving
+              and seatbelt violations</strong
+            >
+            relative to their share of the population. In contrast, the 26–39
+            and 40–64 age groups dominate raw speeding fine numbers, likely
+            reflecting greater vehicle kilometres travelled.
+          </p>
+        </div>
+      </div>
+
+      <!-- TRENDS TAB -->
+      <div class="section" id="tab-trends">
+        <div class="story-header">
+          <h2>How enforcement has changed over time.</h2>
+          <p>
+            Select an offence type and metric to trace the full enforcement
+            history across Australia.
+          </p>
+        </div>
+
+        <div class="controls">
+          <span class="control-label">Metric:</span>
+          <div class="btn-group">
+            <button class="ctrl-btn active" data-metric="FINES">Fines</button>
+            <button class="ctrl-btn" data-metric="ARRESTS">Arrests</button>
+            <button class="ctrl-btn" data-metric="CHARGES">Charges</button>
+          </div>
+          <span class="control-label" style="margin-left: 16px">Offence:</span>
+          <div class="btn-group">
+            <button class="ctrl-btn active" data-offence="all">All</button>
+            <button class="ctrl-btn" data-offence="speed_fines">Speed</button>
+            <button class="ctrl-btn" data-offence="mobile_phone_use">
+              Mobile
+            </button>
+            <button class="ctrl-btn" data-offence="non_wearing_seatbelts">
+              Seatbelt
+            </button>
+            <button class="ctrl-btn" data-offence="unlicensed_driving">
+              Unlicensed
+            </button>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <svg id="trend-chart" height="360"></svg>
+          <div class="legend" id="trend-legend"></div>
+        </div>
+      </div>
+
+      <!-- BREAKDOWN TAB -->
+      <div class="section" id="tab-breakdown">
+        <div class="story-header">
+          <h2>Age groups and where enforcement happens.</h2>
+          <p>
+            Explore how fines and charges are distributed across different
+            demographics and remoteness categories.
+          </p>
+        </div>
+
+        <div class="controls">
+          <span class="control-label">View:</span>
+          <div class="btn-group">
+            <button class="ctrl-btn active" data-view="age">
+              By Age Group
+            </button>
+            <button class="ctrl-btn" data-view="location">By Location</button>
+          </div>
+          <span class="control-label" style="margin-left: 16px">Metric:</span>
+          <div class="btn-group">
+            <button class="ctrl-btn active" data-bk-metric="FINES">
+              Fines
+            </button>
+            <button class="ctrl-btn" data-bk-metric="ARRESTS">Arrests</button>
+            <button class="ctrl-btn" data-bk-metric="CHARGES">Charges</button>
+          </div>
+        </div>
+
+        <div class="chart-card chart-full">
+          <svg id="breakdown-chart" height="360"></svg>
+          <div class="legend" id="breakdown-legend"></div>
+        </div>
+      </div>
+
+      <!-- JURISDICTION TAB -->
+      <div class="section" id="tab-jurisdiction">
+        <div class="story-header">
+          <h2>State by state: different enforcement cultures.</h2>
+          <p>
+            Explore how each Australian state and territory approaches road
+            safety enforcement, adjusted for population size and data
+            availability.
+          </p>
+        </div>
+
+        <div class="controls">
+          <span class="control-label">Metric:</span>
+          <div class="btn-group">
+            <button class="ctrl-btn active" data-jur-metric="FINES">
+              Fines
+            </button>
+            <button class="ctrl-btn" data-jur-metric="ARRESTS">Arrests</button>
+            <button class="ctrl-btn" data-jur-metric="CHARGES">Charges</button>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card chart-full">
+            <h3>All Offences by Jurisdiction</h3>
+            <div class="chart-title">Stacked Total by State / Territory</div>
+            <svg id="juris-chart" height="340"></svg>
+            <div class="legend" id="juris-legend"></div>
+          </div>
+        </div>
+
+        <div class="insight">
+          <div class="insight-label">Population Context</div>
+          <p>
+            <strong>NSW and VIC dominate</strong> total fine counts, consistent
+            with their larger populations. However, per-capita rates reveal that
+            some smaller jurisdictions — particularly ACT and NT — have distinct
+            enforcement patterns, with NT showing elevated unlicensed driving
+            and seatbelt offences in remote areas.
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Tooltip (rendered by JS) -->
+    <div class="tooltip" id="tooltip"></div>
+  </body>
+</html>
