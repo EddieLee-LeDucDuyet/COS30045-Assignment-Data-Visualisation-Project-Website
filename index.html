@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Australian Road Safety Enforcement · BITRE Data Explorer</title>
+    <title>
+      Mobile Phone Behind the Wheel · Australian Enforcement 2008–2024
+    </title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,255 +24,291 @@
       defer
     ></script>
 
-    <!-- App scripts (load order matters) -->
+    <!-- App scripts - loaded in dependency order -->
+    <script src="js/config-utils.js" defer></script>
     <script src="js/data.js" defer></script>
-    <script src="js/config.js" defer></script>
-    <script src="js/tooltip.js" defer></script>
-    <script src="js/charts.js" defer></script>
+    <script src="js/filters.js" defer></script>
+    <script src="js/header.js" defer></script>
+    <script src="js/charts-overview.js" defer></script>
+    <script src="js/charts-timeline.js" defer></script>
+    <script src="js/charts-detection.js" defer></script>
+    <script src="js/charts-demographics.js" defer></script>
+    <script src="js/charts-geography.js" defer></script>
     <script src="js/main.js" defer></script>
   </head>
   <body>
-    <!-- ── HEADER ──────────────────────────────────────────────── -->
+    <!-- HEADER -->
     <header>
       <div class="header-eyebrow">
-        BITRE · Road Safety Enforcement Data 2008–2024
+        BITRE · Mobile Phone Enforcement 2008–2024
       </div>
-      <h1>On Australian Roads<br /><em>Who gets fined, where, and why?</em></h1>
+      <h1>
+        The Rise of Phone-Related<br /><em>Traffic Enforcement in Australia</em>
+      </h1>
       <div class="header-meta">
         <div class="stat-pill">
           <span class="num" id="total-fines">—</span>
           <span class="label">Total Fines</span>
         </div>
         <div class="stat-pill">
-          <span class="num" id="total-arrests">—</span>
-          <span class="label">Arrests</span>
+          <span class="num" id="peak-year">—</span>
+          <span class="label">Peak Year</span>
         </div>
         <div class="stat-pill">
-          <span class="num" id="total-charges">—</span>
-          <span class="label">Charges</span>
-        </div>
-        <div class="stat-pill">
-          <span class="num">8</span>
-          <span class="label">Jurisdictions</span>
+          <span class="num" id="camera-pct">—</span>
+          <span class="label">Camera Detected</span>
         </div>
       </div>
     </header>
 
-    <!-- ── DATA FILTERS ─────────────────────────────────────────── -->
-    <details class="filter-panel" id="data-filters">
-      <summary class="filter-panel-summary">Filter dataset</summary>
-      <div class="filter-panel-body">
-        <p class="filter-hint">
-          <strong>Year / Age:</strong> use a range (from–to) or switch to specific
-          years or age bands. <strong>Other fields:</strong> tick any combination
-          of jurisdictions, locations, offences, and detection types. All choices
-          combine (AND). Defaults include everything.
-        </p>
-        <div class="filter-grid" id="filter-grid"></div>
-        <div class="filter-actions">
-          <button type="button" class="filter-clear-btn" id="filter-clear">
-            Clear all filters
-          </button>
-          <span class="filter-count" id="filter-count"></span>
-        </div>
-      </div>
-    </details>
+    <!-- FILTERS -->
+    <div class="filters-container">
+      <details class="filter-panel" open>
+        <summary class="filter-summary">🔍 Filter Data</summary>
+        <div class="filter-content">
+          <div class="filter-grid">
+            <!-- Year Range Filter -->
+            <div class="filter-group">
+              <label class="filter-label">Year Range</label>
+              <div class="filter-range">
+                <select id="filter-year-min" class="filter-select">
+                  <option value="2008">2008</option>
+                </select>
+                <span>to</span>
+                <select id="filter-year-max" class="filter-select">
+                  <option value="2024">2024</option>
+                </select>
+              </div>
+            </div>
 
-    <!-- ── NAV ─────────────────────────────────────────────────── -->
+            <!-- State Filter -->
+            <div class="filter-group">
+              <label class="filter-label">State/Territory</label>
+              <div class="filter-checkboxes" id="filter-states">
+                <label
+                  ><input type="checkbox" value="all" checked /> All
+                  States</label
+                >
+              </div>
+            </div>
+
+            <!-- Age Group Filter -->
+            <div class="filter-group">
+              <label class="filter-label">Age Group</label>
+              <div class="filter-checkboxes" id="filter-ages">
+                <label
+                  ><input type="checkbox" value="all" checked /> All Ages</label
+                >
+              </div>
+            </div>
+
+            <!-- Detection Method Filter -->
+            <div class="filter-group">
+              <label class="filter-label">Detection Method</label>
+              <div class="filter-checkboxes" id="filter-detection">
+                <label
+                  ><input type="checkbox" value="all" checked /> All
+                  Methods</label
+                >
+              </div>
+            </div>
+          </div>
+          <div class="filter-actions">
+            <button id="apply-filters" class="btn-primary">
+              Apply Filters
+            </button>
+            <button id="reset-filters" class="btn-secondary">Reset</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- NAV -->
     <nav class="nav-tabs">
-      <button class="tab-btn active" data-tab="story">Story</button>
-      <button class="tab-btn" data-tab="trends">Trends</button>
-      <button class="tab-btn" data-tab="breakdown">Age &amp; Location</button>
-      <button class="tab-btn" data-tab="jurisdiction">By State</button>
+      <button class="tab-btn active" data-tab="overview">Overview</button>
+      <button class="tab-btn" data-tab="timeline">Timeline</button>
+      <button class="tab-btn" data-tab="detection">Detection Methods</button>
+      <button class="tab-btn" data-tab="demographics">Demographics</button>
+      <button class="tab-btn" data-tab="geography">By State</button>
     </nav>
 
-    <!-- ── MAIN ─────────────────────────────────────────────────── -->
+    <!-- MAIN -->
     <main>
-      <!-- STORY TAB -->
-      <div class="section active" id="tab-story">
+      <!-- OVERVIEW TAB -->
+      <div class="section active" id="tab-overview">
         <div class="story-header">
-          <h2>Speed dominates, but the real story is in the details.</h2>
+          <h2>From rare to routine: how mobile phones changed enforcement.</h2>
           <p>
-            Over 16 years of road enforcement data from all Australian
-            jurisdictions reveals clear patterns: who breaks the rules, where
-            enforcement is concentrated, and how technology is reshaping
-            detection.
+            Between 2008 and 2024, mobile phone use behind the wheel went from a
+            minor enforcement priority to one of the fastest-growing traffic
+            violation categories in Australia. The introduction of automated
+            camera detection transformed the landscape.
           </p>
         </div>
 
         <div class="chart-grid">
           <div class="chart-card chart-full">
-            <h3>Overview</h3>
-            <div class="chart-title">Total Fines by Offence Type</div>
-            <svg id="story-bar" height="180"></svg>
-            <div class="legend" id="story-bar-legend"></div>
+            <h3>Growth Trajectory</h3>
+            <div class="chart-title">Annual Fines: 2008–2024</div>
+            <svg id="overview-trend" height="320"></svg>
           </div>
 
-          <div class="chart-card chart-full">
-            <h3>Enforcement Over Time</h3>
-            <div class="chart-title">Annual Fines Trend — All Offences</div>
-            <svg id="story-trend" height="260"></svg>
-            <div class="legend" id="story-trend-legend"></div>
+          <div class="chart-card">
+            <h3>Detection Revolution</h3>
+            <div class="chart-title">How Offences Are Caught</div>
+            <svg id="overview-detection" height="280"></svg>
+            <div class="legend" id="detection-legend"></div>
+          </div>
+
+          <div class="chart-card">
+            <h3>Age Profile</h3>
+            <div class="chart-title">Who Gets Caught?</div>
+            <svg id="overview-age" height="280"></svg>
+            <div class="legend" id="age-legend"></div>
           </div>
         </div>
 
         <div class="insight">
           <div class="insight-label">Key Finding</div>
           <p>
-            <strong>Speeding accounts for over 93% of all fines</strong>
-            recorded from 2008 to 2024. Camera-based detection dramatically
-            increased enforcement output from 2015 onward. Meanwhile, mobile
-            phone use fines surged as smartphone adoption grew — and
-            camera-based enforcement began in certain states from 2019.
-          </p>
-        </div>
-
-        <div class="chart-grid">
-          <div class="chart-card">
-            <h3>Detection Method</h3>
-            <div class="chart-title">How Fines Are Issued</div>
-            <svg id="story-detection" height="220"></svg>
-          </div>
-          <div class="chart-card">
-            <h3>Age Group Profile</h3>
-            <div class="chart-title">Offence Distribution by Age</div>
-            <svg id="story-youth" height="220"></svg>
-          </div>
-        </div>
-
-        <div class="insight">
-          <div class="insight-label">Young Driver Insight</div>
-          <p>
-            Drivers aged
-            <strong
-              >17–25 show disproportionately high rates of unlicensed driving
-              and seatbelt violations</strong
-            >
-            relative to their share of the population. In contrast, the 26–39
-            and 40–64 age groups dominate raw speeding fine numbers, likely
-            reflecting greater vehicle kilometres travelled.
+            <strong>Camera-based detection began in 2019</strong> in select
+            jurisdictions (NSW, QLD, ACT, VIC) and now accounts for over
+            <strong>80% of all mobile phone fines</strong>. This represents a
+            fundamental shift from reactive to proactive enforcement.
           </p>
         </div>
       </div>
 
-      <!-- TRENDS TAB -->
-      <div class="section" id="tab-trends">
+      <!-- TIMELINE TAB -->
+      <div class="section" id="tab-timeline">
         <div class="story-header">
-          <h2>How enforcement has changed over time.</h2>
+          <h2>The evolution of mobile phone enforcement.</h2>
           <p>
-            Select an offence type and metric to trace the full enforcement
-            history across Australia.
+            Track how enforcement patterns changed year by year across
+            Australia.
           </p>
-        </div>
-
-        <div class="controls">
-          <span class="control-label">Metric:</span>
-          <div class="btn-group">
-            <button class="ctrl-btn active" data-metric="FINES">Fines</button>
-            <button class="ctrl-btn" data-metric="ARRESTS">Arrests</button>
-            <button class="ctrl-btn" data-metric="CHARGES">Charges</button>
-          </div>
-          <span class="control-label" style="margin-left: 16px">Offence:</span>
-          <div class="btn-group">
-            <button class="ctrl-btn active" data-offence="all">All</button>
-            <button class="ctrl-btn" data-offence="speed_fines">Speed</button>
-            <button class="ctrl-btn" data-offence="mobile_phone_use">
-              Mobile
-            </button>
-            <button class="ctrl-btn" data-offence="non_wearing_seatbelts">
-              Seatbelt
-            </button>
-            <button class="ctrl-btn" data-offence="unlicensed_driving">
-              Unlicensed
-            </button>
-          </div>
-        </div>
-
-        <div class="chart-card">
-          <svg id="trend-chart" height="360"></svg>
-          <div class="legend" id="trend-legend"></div>
-        </div>
-      </div>
-
-      <!-- BREAKDOWN TAB -->
-      <div class="section" id="tab-breakdown">
-        <div class="story-header">
-          <h2>Age groups and where enforcement happens.</h2>
-          <p>
-            Explore how fines and charges are distributed across different
-            demographics and remoteness categories.
-          </p>
-        </div>
-
-        <div class="controls">
-          <span class="control-label">View:</span>
-          <div class="btn-group">
-            <button class="ctrl-btn active" data-view="age">
-              By Age Group
-            </button>
-            <button class="ctrl-btn" data-view="location">By Location</button>
-          </div>
-          <span class="control-label" style="margin-left: 16px">Metric:</span>
-          <div class="btn-group">
-            <button class="ctrl-btn active" data-bk-metric="FINES">
-              Fines
-            </button>
-            <button class="ctrl-btn" data-bk-metric="ARRESTS">Arrests</button>
-            <button class="ctrl-btn" data-bk-metric="CHARGES">Charges</button>
-          </div>
         </div>
 
         <div class="chart-card chart-full">
-          <svg id="breakdown-chart" height="360"></svg>
-          <div class="legend" id="breakdown-legend"></div>
+          <svg id="timeline-chart" height="400"></svg>
+        </div>
+
+        <div class="insight">
+          <div class="insight-label">Notable Patterns</div>
+          <p>
+            <strong>2020 COVID-19 impact:</strong> Total fines dropped sharply
+            during lockdowns, but rebounded quickly.
+            <strong>2019–2020:</strong> Camera detection rollout in NSW caused a
+            dramatic spike. <strong>Post-2021:</strong> Sustained high
+            enforcement levels as camera programs expanded to multiple states.
+          </p>
         </div>
       </div>
 
-      <!-- JURISDICTION TAB -->
-      <div class="section" id="tab-jurisdiction">
+      <!-- DETECTION TAB -->
+      <div class="section" id="tab-detection">
         <div class="story-header">
-          <h2>State by state: different enforcement cultures.</h2>
+          <h2>Technology transformed enforcement.</h2>
           <p>
-            Explore how each Australian state and territory approaches road
-            safety enforcement, adjusted for population size and data
-            availability.
+            Compare police-issued vs camera-detected violations over time and
+            across states.
           </p>
-        </div>
-
-        <div class="controls">
-          <span class="control-label">Metric:</span>
-          <div class="btn-group">
-            <button class="ctrl-btn active" data-jur-metric="FINES">
-              Fines
-            </button>
-            <button class="ctrl-btn" data-jur-metric="ARRESTS">Arrests</button>
-            <button class="ctrl-btn" data-jur-metric="CHARGES">Charges</button>
-          </div>
         </div>
 
         <div class="chart-grid">
           <div class="chart-card chart-full">
-            <h3>All Offences by Jurisdiction</h3>
-            <div class="chart-title">Stacked Total by State / Territory</div>
-            <svg id="juris-chart" height="340"></svg>
-            <div class="legend" id="juris-legend"></div>
+            <h3>Detection Method Over Time</h3>
+            <div class="chart-title">Police vs Camera vs Unknown</div>
+            <svg id="detection-timeline" height="340"></svg>
+            <div class="legend" id="detection-time-legend"></div>
+          </div>
+
+          <div class="chart-card chart-full">
+            <h3>By State</h3>
+            <div class="chart-title">Detection Method Distribution</div>
+            <svg id="detection-state" height="320"></svg>
+            <div class="legend" id="detection-state-legend"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEMOGRAPHICS TAB -->
+      <div class="section" id="tab-demographics">
+        <div class="story-header">
+          <h2>Age and location patterns.</h2>
+          <p>
+            Explore how mobile phone violations vary across age groups and
+            geographic regions.
+          </p>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card chart-full">
+            <h3>Age Distribution</h3>
+            <div class="chart-title">Fines by Age Group (Total 2008–2024)</div>
+            <svg id="demo-age-bars" height="300"></svg>
+          </div>
+
+          <div class="chart-card chart-full">
+            <h3>Geographic Distribution</h3>
+            <div class="chart-title">Major Cities vs Regional vs Remote</div>
+            <svg id="demo-location" height="300"></svg>
           </div>
         </div>
 
         <div class="insight">
-          <div class="insight-label">Population Context</div>
+          <div class="insight-label">Demographic Insight</div>
           <p>
-            <strong>NSW and VIC dominate</strong> total fine counts, consistent
-            with their larger populations. However, per-capita rates reveal that
-            some smaller jurisdictions — particularly ACT and NT — have distinct
-            enforcement patterns, with NT showing elevated unlicensed driving
-            and seatbelt offences in remote areas.
+            <strong
+              >Ages 26–39 and 40–64 account for over 75% of all mobile phone
+              fines</strong
+            >, reflecting higher vehicle usage and smartphone adoption in these
+            demographics. Enforcement is heavily concentrated in
+            <strong>major cities and inner regional areas</strong>, with limited
+            data from remote regions.
+          </p>
+        </div>
+      </div>
+
+      <!-- GEOGRAPHY TAB -->
+      <div class="section" id="tab-geography">
+        <div class="story-header">
+          <h2>State by state: different approaches.</h2>
+          <p>
+            Compare enforcement levels and methods across Australian
+            jurisdictions.
+          </p>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card chart-full">
+            <h3>Total Enforcement</h3>
+            <div class="chart-title">Fines by State (2008–2024)</div>
+            <svg id="geo-total" height="320"></svg>
+          </div>
+
+          <div class="chart-card chart-full">
+            <h3>Year-over-Year Trends</h3>
+            <div class="chart-title">State Comparison Timeline</div>
+            <svg id="geo-timeline" height="340"></svg>
+            <div class="legend" id="geo-legend"></div>
+          </div>
+        </div>
+
+        <div class="insight">
+          <div class="insight-label">Geographic Pattern</div>
+          <p>
+            <strong>NSW leads in absolute numbers</strong>, driven by early
+            camera adoption. <strong>VIC, QLD, and ACT</strong> have also
+            implemented camera programs. States without camera systems (SA, WA,
+            TAS, NT) show steady but much lower enforcement levels relying
+            primarily on police stops.
           </p>
         </div>
       </div>
     </main>
 
-    <!-- Tooltip (rendered by JS) -->
+    <!-- Tooltip -->
     <div class="tooltip" id="tooltip"></div>
   </body>
 </html>
