@@ -79,3 +79,6 @@ function processData() {
   });
   stateData = Array.from(stateMap.values());
 }
+
+console.log('Raw data rows:', rawData.length);
+console.log('Years in data:', yearlyData.map(d => d.year));
