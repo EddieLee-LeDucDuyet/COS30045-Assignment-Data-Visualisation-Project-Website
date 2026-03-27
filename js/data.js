@@ -4,13 +4,25 @@
 
 // ── DATA LOADING & PROCESSING ───────────────────────────────
 async function loadData() {
-  const csv = await d3.csv('data/cleaned_dataset(mobile).csv', d3.autoType);
-  
-  rawData = csv.filter(d => 
-    d.YEAR && d.FINES != null && d.JURISDICTION
-  );
-  
-  processData();
+  try {
+    const csv = await d3.csv('data/cleaned_dataset(mobile).csv', d3.autoType);
+    
+    console.log('CSV loaded:', csv.length, 'rows');
+    console.log('Sample row:', csv[0]);
+    console.log('Column names:', Object.keys(csv[0] || {}));
+    
+    // Less strict filter - keep rows with valid YEAR and JURISDICTION
+    rawData = csv.filter(d => 
+      d.YEAR && d.JURISDICTION
+    );
+    
+    console.log('After filtering:', rawData.length, 'rows');
+    console.log('Sample filtered row:', rawData[0]);
+    
+    processData();
+  } catch (error) {
+    console.error('Error loading data:', error);
+  }
 }
 
 function processData() {
