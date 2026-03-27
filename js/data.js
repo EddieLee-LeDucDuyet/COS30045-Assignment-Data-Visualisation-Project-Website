@@ -90,7 +90,13 @@ function processData() {
     stateMap.get(key).fines += d.FINES || 0;
   });
   stateData = Array.from(stateMap.values());
+
+  console.log('Data processed successfully:');
+  console.log('- Yearly data points:', yearlyData.length);
+  console.log('- Detection data points:', detectionData.length);
+  console.log('- Age groups:', ageData.length);
+  console.log('- Total fines:', yearlyData.reduce((sum, d) => sum + d.fines, 0));
 }
 
-console.log('Raw data rows:', rawData.length);
-console.log('Years in data:', yearlyData.map(d => d.year));
+// console.log('Raw data rows:', rawData.length);
+// console.log('Years in data:', yearlyData.map(d => d.year));
