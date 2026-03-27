@@ -17,20 +17,34 @@ function initializeFilters() {
   const yearMin = document.getElementById('filter-year-min');
   const yearMax = document.getElementById('filter-year-max');
   
+  // CRITICAL: Clear existing options first (HTML has hardcoded 2008 and 2024)
+  yearMin.innerHTML = '';
+  yearMax.innerHTML = '';
+  
+  // Create years array and sort numerically
+  const years = [];
   for (let year = 2008; year <= 2024; year++) {
-    if (year > 2008) {
-      const optMin = document.createElement('option');
-      optMin.value = year;
-      optMin.textContent = year;
-      yearMin.appendChild(optMin);
-    }
-    if (year < 2024) {
-      const optMax = document.createElement('option');
-      optMax.value = year;
-      optMax.textContent = year;
-      yearMax.appendChild(optMax);
-    }
+    years.push(year);
   }
+  
+  // Populate min dropdown (2008-2023) - all years except the last one
+  years.slice(0, -1).forEach(year => {
+    const opt = document.createElement('option');
+    opt.value = year;
+    opt.textContent = year;
+    yearMin.appendChild(opt);
+  });
+  
+  // Populate max dropdown (2009-2024) - all years except the first one
+  years.slice(1).forEach(year => {
+    const opt = document.createElement('option');
+    opt.value = year;
+    opt.textContent = year;
+    yearMax.appendChild(opt);
+  });
+  
+  // Set default values
+  yearMin.value = 2008;
   yearMax.value = 2024;
   
   // Populate state checkboxes
