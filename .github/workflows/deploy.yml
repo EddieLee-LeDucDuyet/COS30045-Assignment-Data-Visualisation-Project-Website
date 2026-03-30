@@ -32,8 +32,11 @@ jobs:
       - name: Verify site files
         run: |
           test -f index.html
-          test -f js/main.js
-          test -f js/data.js
+          test -f js/app.js
+          test -f js/utils/dataLoader.js
+          test -f js/utilshelper.js
+          test -f js/utils/tooltip.js
+          test -f js/modules/config.js
           test -f css/styles.css
           test -d data
 
