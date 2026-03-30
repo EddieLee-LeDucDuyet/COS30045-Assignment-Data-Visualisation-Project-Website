@@ -47,32 +47,32 @@ export function createStatsDashboard(containerId = 'stats-dashboard') {
     const stats = [
         { 
             value: formatNumber(totalFines), 
-            label: 'Total Fines Issued',
+            label: 'Total Fines Issued between ',
             sublabel: '2008-2024'
         },
         { 
             value: formatNumber(totalCharges), 
-            label: 'Total Charges Laid',
+            label: 'Total Charges Laid ',
             sublabel: 'Across all jurisdictions'
         },
         { 
             value: formatNumber(totalArrests), 
-            label: 'Total Arrests Made',
+            label: 'Total Arrests Made by ',
             sublabel: 'Police detections'
         },
         { 
             value: peakYear.year.toString(), 
-            label: 'Peak Enforcement Year',
+            label: 'Peak Enforcement Year ',
             sublabel: `${formatNumber(peakYear.fines)} fines`
         },
         { 
             value: formatNumber(nsw2020CameraTotal), 
-            label: 'NSW Camera Fines (2020)',
+            label: 'NSW Camera Fines (2020) ',
             sublabel: `Up from ${formatNumber(nsw2019Total)} in 2019`
         },
         { 
             value: '8', 
-            label: 'Jurisdictions Covered',
+            label: 'Jurisdictions Covered ',
             sublabel: 'All states & territories'
         }
     ];
