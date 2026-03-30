@@ -1,44 +1,58 @@
-name: CI/CD
+# Verify on every push/PR to main; deploy to Pages only on push to main (or manual).
+# Settings → Pages → Source: GitHub Actions
+
+name: CI and CD
 
 on:
-  # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we are dealing with static files
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps:deployment.outputs.page_url }}
+  verify:
+    name: Verify site
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
+      - name: Verify site files
+        run: |
+          test -f index.html
+          test -f js/app.js
+          test -f js/modules/config.js
+          test -f css/styles.css
+          test -d data
 
-      - name: Upload artifact
+  deploy:
+    name: Deploy GitHub Pages
+    needs: verify
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the entire repository (includes index.html, css/, data/, and js files)
-          path: '.'
+          path: .
 
       - name: Deploy to GitHub Pages
         id: deployment
