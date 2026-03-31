@@ -9,16 +9,21 @@ import { formatNumber, getChartDimensions } from '../utils/helpers.js';
 import { showTooltip, hideTooltip } from '../utils/tooltip.js';
 
 // Full ordered list including '0-65+' as the last bar
-// (inherits the order from config and appends '0-65+' if not already present)
 const FULL_AGE_ORDER = (() => {
     const order = [...ageGroupOrder];
     if (!order.includes('0-65+')) order.push('0-65+');
     return order;
 })();
 
+// A bar must be at least this many pixels tall to hold an INSIDE label
+const INSIDE_LABEL_MIN_PX = 20;
+
+// A bar must have at least this value to get ANY label (skip true zeros)
+const MIN_VALUE_FOR_LABEL = 1;
+
 export function createDemographicsChart() {
     const jurisdictionSelect = document.getElementById('demo-jurisdiction');
-    const yearSelect = document.getElementById('demo-year');
+    const yearSelect         = document.getElementById('demo-year');
 
     jurisdictionSelect.addEventListener('change', updateChart);
     yearSelect.addEventListener('change', updateChart);
@@ -28,13 +33,13 @@ export function createDemographicsChart() {
 
 function updateChart() {
     const jurisdiction = document.getElementById('demo-jurisdiction').value;
-    const year = +document.getElementById('demo-year').value;
-    const container = document.getElementById('demographics-chart');
+    const year         = +document.getElementById('demo-year').value;
+    const container    = document.getElementById('demographics-chart');
 
     d3.select('#demographics-chart').selectAll('*').remove();
 
-    // ── Fetch and aggregate data ──────────────────────────────────────────────
-    const rawRows = getDemographicBreakdown(jurisdiction, year);  // all locations aggregated
+    // ── Fetch & shape data ────────────────────────────────────────────────────
+    const rawRows = getDemographicBreakdown(jurisdiction, year);
 
     if (rawRows.length === 0) {
         d3.select('#demographics-chart')
@@ -46,7 +51,6 @@ function updateChart() {
         return;
     }
 
-    // Group rows into { ageGroup, Police, Camera }
     const grouped = d3.group(rawRows, d => d.ageGroup);
     const barData = Array.from(grouped, ([ageGroup, values]) => {
         const policeRow = values.find(v => v.detectionMethod === 'Police');
@@ -58,36 +62,36 @@ function updateChart() {
         };
     });
 
-    // Sort by canonical age-group order; unknowns go last
     barData.sort((a, b) => {
         const ai = FULL_AGE_ORDER.indexOf(a.ageGroup);
         const bi = FULL_AGE_ORDER.indexOf(b.ageGroup);
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
 
-    // Determine which detection methods actually have data (skip empty bars)
     const hasPolice = barData.some(d => d.Police > 0);
     const hasCamera = barData.some(d => d.Camera > 0);
-    const methods = ['Police', 'Camera'].filter(m =>
+    const methods   = ['Police', 'Camera'].filter(m =>
         m === 'Police' ? hasPolice : hasCamera
     );
 
     // ── Layout ────────────────────────────────────────────────────────────────
-    const dims = getChartDimensions(container, config.margin);
+    // Extra top margin so above-bar labels for the tallest bars don't clip
+    const margin = { ...config.margin, top: 60 };
+    const dims   = getChartDimensions(container, margin);
 
     const svg = d3.select('#demographics-chart')
         .append('svg')
-        .attr('width', dims.width)
+        .attr('width',  dims.width)
         .attr('height', dims.height);
 
     const g = svg.append('g')
-        .attr('transform', `translate(${config.margin.left},${config.margin.top})`);
+        .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Subtitle: describe location scope so users understand what "all locations" means
+    // Subtitle
     const locationLabel = getDemographicLocationLabel(jurisdiction, year);
     g.append('text')
         .attr('x', dims.innerWidth / 2)
-        .attr('y', -18)
+        .attr('y', -38)
         .attr('text-anchor', 'middle')
         .style('font-size', '12px')
         .style('fill', 'var(--text-secondary)')
@@ -106,8 +110,9 @@ function updateChart() {
 
     const yMax = d3.max(barData, d => Math.max(d.Police, d.Camera)) || 1;
 
+    // Reserve headroom at the top for above-bar labels (≈ one label height + gap)
     const yScale = d3.scaleLinear()
-        .domain([0, yMax * 1.12])   // 12 % headroom so labels never clip
+        .domain([0, yMax * 1.18])
         .nice()
         .range([dims.innerHeight, 0]);
 
@@ -148,7 +153,7 @@ function updateChart() {
         .style('fill', 'currentColor')
         .text('Number of Fines');
 
-    // ── Bars ──────────────────────────────────────────────────────────────────
+    // ── Bar groups ────────────────────────────────────────────────────────────
     const ageGroups = g.selectAll('.age-group')
         .data(barData)
         .join('g')
@@ -163,11 +168,11 @@ function updateChart() {
             ageGroup: d.ageGroup
         })))
         .join('rect')
-        .attr('x', d => x1(d.method))
-        .attr('y', d => yScale(d.value))
-        .attr('width', x1.bandwidth())
+        .attr('x',      d => x1(d.method))
+        .attr('y',      d => yScale(d.value))
+        .attr('width',  x1.bandwidth())
         .attr('height', d => dims.innerHeight - yScale(d.value))
-        .attr('fill', d => d.method === 'Police' ? config.colors.police : config.colors.camera)
+        .attr('fill',   d => d.method === 'Police' ? config.colors.police : config.colors.camera)
         .attr('rx', 3)
         .on('mouseover', function (event, d) {
             d3.select(this).attr('opacity', 0.75);
@@ -181,61 +186,78 @@ function updateChart() {
             hideTooltip();
         });
 
-    // Value labels on top of bars (only when bar is tall enough to fit text)
-    const MIN_LABEL_PX = 22;
+    // ── Value labels — always shown for every non-zero bar ───────────────────
+    //
+    // Placement logic:
+    //   • barPx >= INSIDE_LABEL_MIN_PX  → label sits INSIDE the bar (white text)
+    //   • barPx <  INSIDE_LABEL_MIN_PX  → label sits ABOVE  the bar (muted text)
+    //   • value === 0                   → no label
+    //
     ageGroups.selectAll('.bar-label')
         .data(d => methods.map(method => ({
             method,
-            value: d[method],
+            value:    d[method],
             ageGroup: d.ageGroup
         })))
         .join('text')
         .attr('class', 'bar-label')
         .attr('x', d => x1(d.method) + x1.bandwidth() / 2)
-        .attr('y', d => yScale(d.value) - 4)
-        .attr('text-anchor', 'middle')
-        .style('font-size', '10px')
-        .style('fill', 'var(--text-secondary)')
-        .text(d => {
+        .attr('y', d => {
+            if (d.value < MIN_VALUE_FOR_LABEL) return 0; // won't be shown
             const barPx = dims.innerHeight - yScale(d.value);
-            return d.value > 0 && barPx > MIN_LABEL_PX ? formatNumber(d.value) : '';
-        });
+            if (barPx >= INSIDE_LABEL_MIN_PX) {
+                // Inside: vertically centred in bar
+                return yScale(d.value) + barPx / 2 + 4;
+            } else {
+                // Above: a fixed gap above the bar top
+                return yScale(d.value) - 5;
+            }
+        })
+        .attr('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('font-weight', '600')
+        .style('pointer-events', 'none')
+        .style('fill', d => {
+            if (d.value < MIN_VALUE_FOR_LABEL) return 'none';
+            const barPx = dims.innerHeight - yScale(d.value);
+            return barPx >= INSIDE_LABEL_MIN_PX ? 'white' : 'var(--text-secondary)';
+        })
+        .text(d => d.value >= MIN_VALUE_FOR_LABEL ? formatNumber(d.value) : '');
 
     // ── Legend ────────────────────────────────────────────────────────────────
     const legendDiv = d3.select('#demographics-chart')
         .append('div')
-        .style('display', 'flex')
-        .style('flex-wrap', 'wrap')
-        .style('gap', '20px')
+        .style('display',         'flex')
+        .style('flex-wrap',       'wrap')
+        .style('gap',             '20px')
         .style('justify-content', 'center')
-        .style('padding', '12px 0 4px 0')
-        .style('margin-top', '8px');
+        .style('padding',         '12px 0 4px 0')
+        .style('margin-top',      '8px');
 
     methods.forEach(method => {
         const item = legendDiv.append('div')
-            .style('display', 'flex')
+            .style('display',     'flex')
             .style('align-items', 'center')
-            .style('gap', '8px');
+            .style('gap',         '8px');
 
         item.append('div')
-            .style('width', '18px')
-            .style('height', '18px')
-            .style('border-radius', '3px')
+            .style('width',            '18px')
+            .style('height',           '18px')
+            .style('border-radius',    '3px')
             .style('background-color',
                 method === 'Police' ? config.colors.police : config.colors.camera)
             .style('flex-shrink', '0');
 
         item.append('span')
             .style('font-size', '13px')
-            .style('color', 'var(--text-primary)')
+            .style('color',     'var(--text-primary)')
             .text(method);
     });
 
-    // Note for jurisdictions with no Camera data at all
     if (!hasCamera) {
         legendDiv.append('span')
-            .style('font-size', '12px')
-            .style('color', 'var(--text-secondary)')
+            .style('font-size',  '12px')
+            .style('color',      'var(--text-secondary)')
             .style('font-style', 'italic')
             .text('ℹ️ No camera detection data recorded for this jurisdiction / year');
     }
