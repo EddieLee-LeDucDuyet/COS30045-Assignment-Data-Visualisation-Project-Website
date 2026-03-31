@@ -212,43 +212,34 @@ function updateTrendChart(containerId) {
             });
     });
     
-    // Add annotation for NSW 2020 if selected
-    if (selectedJurisdictions.has('NSW')) {
-        const nswLine = lineData.find(d => d.jurisdiction === 'NSW');
-        if (nswLine) {
-            const point2020 = nswLine.values.find(v => v.year === 2020);
-            if (point2020) {
-                const x = xScale(2020);
-                const y = yScale(point2020.fines);
-                
-                // Annotation label at the top of the chart
-                g.append('text')
-                    .attr('class', 'annotation-text')
-                    .attr('x', x - 20)
-                    .attr('y', 12)
-                    .attr('fill', '#e74c3c')
-                    .style('font-size', '12px')
-                    .style('font-weight', '600')
-                    .text('Camera introduction');
-                
-                // Annotation line goes from top of chart to x-axis
-                g.append('line')
-                    .attr('class', 'annotation-line')
-                    .attr('x1', x)
-                    .attr('y1', 0)
-                    .attr('x2', x)
-                    .attr('y2', dims.innerHeight)
-                    .attr('stroke', '#e74c3c')
-                    .attr('stroke-width', 2)
-                    .attr('stroke-dasharray', '5,5');
+    // Add annotation for camera introduction in 2020 (always visible)
+    const x2020 = xScale(2020);
 
-                // Arrow head at the bottom
-                g.append('polygon')
-                    .attr('points', `${x - 5},${dims.innerHeight - 10} ${x + 5},${dims.innerHeight - 10} ${x},${dims.innerHeight}`)
-                    .attr('fill', '#e74c3c');
-            }
-        }
-    }
+    // Annotation label at the top of the chart
+    g.append('text')
+        .attr('class', 'annotation-text')
+        .attr('x', x2020 - 20)
+        .attr('y', 12)
+        .attr('fill', '#e74c3c')
+        .style('font-size', '12px')
+        .style('font-weight', '600')
+        .text('Camera introduction');
+
+    // Annotation line goes from top of chart to x-axis
+    g.append('line')
+        .attr('class', 'annotation-line')
+        .attr('x1', x2020)
+        .attr('y1', 0)
+        .attr('x2', x2020)
+        .attr('y2', dims.innerHeight)
+        .attr('stroke', '#e74c3c')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '5,5');
+
+    // Arrow head at the bottom
+    g.append('polygon')
+        .attr('points', `${x2020 - 5},${dims.innerHeight - 10} ${x2020 + 5},${dims.innerHeight - 10} ${x2020},${dims.innerHeight}`)
+        .attr('fill', '#e74c3c');
     
     // Create HTML legend BELOW the SVG (outside the chart)
     const legendDiv = d3.select(`#${containerId}`)
