@@ -20,9 +20,7 @@ export async function loadData() {
     try {
         console.time('Data Loading');
         
-        // Load CSV with optimized parsing
         const rawData = await d3.csv('data/ed.csv', (d) => {
-            // Parse inline during CSV read for better performance
             return {
                 year: +d.YEAR,
                 jurisdiction: d.JURISDICTION,
@@ -35,7 +33,6 @@ export async function loadData() {
             };
         });
         
-        // Filter invalid rows
         cachedData = rawData.filter(d => d.year && d.jurisdiction);
         
         console.timeEnd('Data Loading');
@@ -64,47 +61,36 @@ export function filterData(filters = {}) {
     
     let filtered = [...cachedData];
     
-    // Apply filters
     if (filters.year) {
         filtered = filtered.filter(d => d.year === filters.year);
     }
-    
     if (filters.years) {
         filtered = filtered.filter(d => filters.years.includes(d.year));
     }
-    
     if (filters.yearRange) {
-        filtered = filtered.filter(d => 
-            d.year >= filters.yearRange[0] && 
+        filtered = filtered.filter(d =>
+            d.year >= filters.yearRange[0] &&
             d.year <= filters.yearRange[1]
         );
     }
-    
     if (filters.jurisdiction) {
         filtered = filtered.filter(d => d.jurisdiction === filters.jurisdiction);
     }
-    
     if (filters.jurisdictions) {
         filtered = filtered.filter(d => filters.jurisdictions.includes(d.jurisdiction));
     }
-    
     if (filters.location) {
         filtered = filtered.filter(d => d.location === filters.location);
     }
-    
     if (filters.ageGroup) {
         filtered = filtered.filter(d => d.ageGroup === filters.ageGroup);
     }
-    
     if (filters.detectionMethod) {
         filtered = filtered.filter(d => d.detectionMethod === filters.detectionMethod);
     }
-    
-    // Exclude filters
     if (filters.excludeAgeGroups) {
         filtered = filtered.filter(d => !filters.excludeAgeGroups.includes(d.ageGroup));
     }
-    
     if (filters.minFines) {
         filtered = filtered.filter(d => d.fines >= filters.minFines);
     }
@@ -116,10 +102,9 @@ export function filterData(filters = {}) {
  * Get aggregated data by grouping keys
  * @param {Array} data - Data array
  * @param {Array} groupKeys - Keys to group by
- * @param {string} sumKey - Key to sum (default: 'fines')
  * @returns {Array} Aggregated data
  */
-export function aggregateData(data, groupKeys, sumKey = 'fines') {
+export function aggregateData(data, groupKeys) {
     const grouped = d3.rollups(
         data,
         v => ({
@@ -131,18 +116,11 @@ export function aggregateData(data, groupKeys, sumKey = 'fines') {
         ...groupKeys.map(key => d => d[key])
     );
     
-    // Flatten the nested structure
     function flatten(arr, keys, level = 0) {
-        if (level === keys.length) {
-            return arr;
-        }
-        
+        if (level === keys.length) return arr;
         return arr.flatMap(([key, value]) => {
             if (level === keys.length - 1) {
-                return [{
-                    [keys[level]]: key,
-                    ...value
-                }];
+                return [{ [keys[level]]: key, ...value }];
             }
             return flatten(value, keys, level + 1).map(item => ({
                 [keys[level]]: key,
@@ -155,9 +133,7 @@ export function aggregateData(data, groupKeys, sumKey = 'fines') {
 }
 
 /**
- * Get yearly trends for jurisdictions
- * @param {Array} jurisdictions - Array of jurisdiction codes
- * @returns {Array} Trend data
+ * Get yearly trends for jurisdictions.
  */
 export function getYearlyTrends(jurisdictions) {
     const filtered = filterData({
@@ -165,46 +141,84 @@ export function getYearlyTrends(jurisdictions) {
         location: config.dataFilters.generalLocation,
         ageGroup: config.dataFilters.allAges
     });
-    
     return aggregateData(filtered, ['jurisdiction', 'year']);
 }
 
 /**
  * Get detection method comparison
- * @param {number} year - Year to compare
- * @returns {Array} Comparison data
  */
 export function getDetectionMethodComparison(year) {
     const filtered = filterData({
         year,
         location: config.dataFilters.generalLocation
     });
-    
     return aggregateData(filtered, ['detectionMethod']);
 }
 
 /**
- * Get demographic breakdown
- * @param {string} jurisdiction - Jurisdiction code
- * @param {number} year - Year
- * @returns {Array} Demographic data
+ * Get demographic breakdown for a jurisdiction and year.
+ *
+ * Location structure varies widely across jurisdictions and years:
+ *
+ *   Jurisdiction | 2023 locations              | 2024 locations
+ *   -------------|-----------------------------|---------------------------------
+ *   ACT          | Major Cities only           | Major Cities only
+ *   NSW          | General + Major Cities + …  | General + Major Cities + …
+ *   NT           | General only                | General only
+ *   QLD          | General only (0-65+ only!)  | General only (full age groups)
+ *   SA           | General only                | General + Major Cities + …
+ *   TAS          | General only                | General only
+ *   VIC          | General + Major Cities + …  | General + Major Cities + …
+ *   WA           | General only                | General only
+ *
+ * Critically, for VIC (and sometimes NSW), Police detections are recorded
+ * under "General" while Camera detections are recorded under "Major Cities"
+ * or other locations — so filtering to any single location would hide one
+ * of the two detection-method bars entirely.
+ *
+ * Solution: always aggregate across ALL locations for the given jurisdiction
+ * and year. This ensures both Police and Camera bars are always visible
+ * regardless of how the source data distributes records across locations.
+ *
+ * '0-65+' is intentionally kept so it appears as its own bar.
+ * Only the synthetic label 'All ages' is excluded.
+ *
+ * @param {string} jurisdiction
+ * @param {number} year
+ * @returns {Array} rows: { ageGroup, detectionMethod, fines, arrests, charges }
  */
 export function getDemographicBreakdown(jurisdiction, year) {
-    const filtered = filterData({
+    const data = filterData({
         jurisdiction,
         year,
-        location: config.dataFilters.majorCities,
-        excludeAgeGroups: ['0-65+', 'All ages']
+        excludeAgeGroups: ['All ages']
     });
-    
-    return aggregateData(filtered, ['ageGroup', 'detectionMethod']);
+    return aggregateData(data, ['ageGroup', 'detectionMethod']);
+}
+
+/**
+ * Build a human-readable subtitle describing the location scope
+ * used for a jurisdiction/year, for display below the chart title.
+ *
+ * @param {string} jurisdiction
+ * @param {number} year
+ * @returns {string}
+ */
+export function getDemographicLocationLabel(jurisdiction, year) {
+    const data = filterData({ jurisdiction, year });
+    const locations = [...new Set(data.map(d => d.location))].filter(Boolean);
+
+    if (locations.length === 0) return '';
+    if (locations.length === 1) {
+        return locations[0] === 'General'
+            ? 'All Locations (General reporting)'
+            : locations[0];
+    }
+    return `All Locations aggregated (${locations.length} location types)`;
 }
 
 /**
  * Get geographic distribution
- * @param {string} jurisdiction - Jurisdiction code
- * @param {number} year - Year
- * @returns {Array} Geographic data
  */
 export function getGeographicDistribution(jurisdiction, year) {
     const filtered = filterData({
@@ -212,34 +226,20 @@ export function getGeographicDistribution(jurisdiction, year) {
         year,
         excludeAgeGroups: ['0-65+', 'All ages']
     });
-    
-    // Exclude 'General' location
     const withoutGeneral = filtered.filter(d => d.location !== 'General');
-    
     return aggregateData(withoutGeneral, ['location']);
 }
 
-/**
- * Get available years in dataset
- * @returns {Array} Sorted array of years
- */
 export function getAvailableYears() {
     if (!cachedData) return [];
     return [...new Set(cachedData.map(d => d.year))].sort();
 }
 
-/**
- * Get available jurisdictions
- * @returns {Array} Sorted array of jurisdiction codes
- */
 export function getAvailableJurisdictions() {
     if (!cachedData) return [];
     return [...new Set(cachedData.map(d => d.jurisdiction))].sort();
 }
 
-/**
- * Clear cached data (useful for reloading)
- */
 export function clearCache() {
     cachedData = null;
 }
