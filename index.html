@@ -20,7 +20,6 @@
 
     <!-- Inline Critical CSS for Instant Display -->
     <style>
-      /* Critical above-the-fold styles */
       body {
         margin: 0;
         padding: 0;
@@ -49,7 +48,6 @@
         margin: 0 auto;
         padding: 0 1.5rem;
       }
-      /* Loading indicator */
       .initial-loader {
         position: fixed;
         top: 0;
@@ -98,6 +96,7 @@
         <p>Loading visualization...</p>
       </div>
     </div>
+
     <!-- Header Section -->
     <header class="main-header">
       <div class="container">
@@ -120,9 +119,7 @@
         <button class="nav-btn" data-section="demographics">
           Risk Profiles
         </button>
-        <button class="nav-btn" data-section="severity">
-          Enforcement Severity
-        </button>
+        <button class="nav-btn" data-section="fines">Total Fines</button>
       </div>
     </nav>
 
@@ -140,16 +137,14 @@
               fundamentally changed the scale and nature of mobile phone
               enforcement.
             </p>
-
             <div class="key-insight">
               <h3>Key Insight</h3>
               <p>
                 In NSW, fines increased from <strong>25,463 in 2019</strong> to
-                <strong>138,847 in 2020 </strong> a 445% jump following the
-                introduction of mobile phone detection cameras.
+                <strong>138,847 in 2020</strong> &mdash; a 445% jump following
+                the introduction of mobile phone detection cameras.
               </p>
             </div>
-
             <p>
               This interactive story explores five key narratives within the
               data:
@@ -164,20 +159,19 @@
                 to automated detection
               </li>
               <li>
-                <strong>Risk Profiles:</strong> Which age groups are caught most
-                frequently
+                <strong>Risk Profiles:</strong> Which age groups and locations
+                are caught most frequently
               </li>
               <li>
                 <strong>Urban Focus:</strong> The concentration of enforcement
                 in major cities
               </li>
               <li>
-                <strong>Severity Divide:</strong> How police and camera
-                detections differ in consequences
+                <strong>Total Fines:</strong> Year-by-year national fine counts
+                from 2008 to 2024
               </li>
             </ul>
           </div>
-
           <div class="viz-container">
             <h3>Quick Stats Dashboard</h3>
             <div id="stats-dashboard"></div>
@@ -192,13 +186,11 @@
               The introduction of camera technology marked a clear turning point
               in enforcement patterns across Australia.
             </p>
-
             <div class="controls-panel">
               <h4>Select Jurisdictions to Compare:</h4>
               <div id="jurisdiction-controls"></div>
             </div>
           </div>
-
           <div class="viz-container">
             <div id="trend-chart"></div>
             <div class="chart-annotation">
@@ -220,17 +212,15 @@
               phone users. What took thousands of officers years to accomplish,
               cameras can now do in months.
             </p>
-
             <div class="key-insight">
               <h3>The Efficiency Gap</h3>
               <p>
                 In Queensland 2024, cameras issued
                 <strong>28,641 fines</strong> to drivers aged 40-64, while
-                police issued just <strong>849</strong> to the same group—a 33:1
-                ratio.
+                police issued just <strong>849</strong> to the same
+                group&mdash;a 33:1 ratio.
               </p>
             </div>
-
             <div class="controls-panel">
               <label for="year-slider"
                 >Year: <span id="year-display">2024</span></label
@@ -245,7 +235,6 @@
               />
             </div>
           </div>
-
           <div class="viz-container">
             <div id="enforcement-chart"></div>
             <div class="chart-annotation">
@@ -264,11 +253,10 @@
           <div class="story-text">
             <h2>Demographic Risk Profiles</h2>
             <p class="lead">
-              Not all age groups are caught equally. Younger drivers,
-              particularly those aged 17-39, represent the highest risk
+              Not all age groups or locations are caught equally. Younger
+              drivers and those in major cities represent the highest risk
               categories.
             </p>
-
             <div class="controls-panel">
               <label for="demo-jurisdiction">Select Jurisdiction:</label>
               <select id="demo-jurisdiction">
@@ -281,7 +269,6 @@
                 <option value="ACT">Australian Capital Territory</option>
                 <option value="NT">Northern Territory</option>
               </select>
-
               <label for="demo-year">Year:</label>
               <select id="demo-year">
                 <option value="2024">2024</option>
@@ -289,108 +276,53 @@
               </select>
             </div>
           </div>
-
           <div class="viz-container">
             <div id="demographics-chart"></div>
             <div class="chart-annotation">
               <p>
                 <strong>Key Finding:</strong> In NSW Major Cities (2024), the
                 17-25 and 26-39 age groups had 4,539 and 4,401 fines
-                respectively, while drivers over 65 received only 332 fines.
+                respectively across all location types.
               </p>
             </div>
           </div>
         </section>
 
-        <!-- Section 5: Geography -->
-        <section id="geography" class="story-section">
+        <!-- Section 5: Total Fines Histogram -->
+        <section id="fines" class="story-section">
           <div class="story-text">
-            <h2>Geographic Concentration: Urban vs Regional</h2>
+            <h2>Total Fines: 2008&ndash;2024</h2>
             <p class="lead">
-              Mobile phone enforcement is overwhelmingly urban-centric. Remote
-              and very remote areas see minimal enforcement activity.
+              A year-by-year view of every fine issued across all Australian
+              jurisdictions, stacked by detection method. The introduction of
+              camera technology in 2020 triggered a sustained surge in national
+              enforcement volumes.
             </p>
-
             <div class="key-insight">
-              <h3>Urban Dominance</h3>
+              <h3>The Scale of the Shift</h3>
               <p>
-                In South Australia (2024), drivers aged 26-39 received
-                <strong>1,575 fines</strong> in Major Cities compared to only
-                <strong>16 in Remote</strong> and
-                <strong>8 in Very Remote</strong> areas.
-              </p>
-            </div>
-
-            <div class="controls-panel">
-              <label for="geo-jurisdiction">Select Jurisdiction:</label>
-              <select id="geo-jurisdiction">
-                <option value="NSW">New South Wales</option>
-                <option value="VIC">Victoria</option>
-                <option value="SA">South Australia</option>
-                <option value="ACT">Australian Capital Territory</option>
-              </select>
-              <p style="font-size: 0.9em; color: #7f8c8d; margin-top: 10px">
-                ℹ️ <strong>Note:</strong> Only ACT, NSW, SA, and VIC have
-                detailed location breakdowns in 2024. Other jurisdictions only
-                report "General" totals.
+                Before cameras, annual national fines peaked around
+                <strong>170,000</strong>. By 2023, that figure had grown to over
+                <strong>390,000</strong> &mdash; driven almost entirely by
+                automated detection.
               </p>
             </div>
           </div>
-
           <div class="viz-container">
-            <div id="geography-chart"></div>
+            <div id="fines-chart"></div>
             <div class="chart-annotation">
               <p>
-                <strong>Understanding the treemap:</strong> Each rectangle
-                represents a location type. The size shows the volume of fines
-                issued. Hover to see exact numbers.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <!-- Section 6: Severity -->
-        <section id="severity" class="story-section">
-          <div class="story-text">
-            <h2>Enforcement Severity: Fines vs Legal Consequences</h2>
-            <p class="lead">
-              While cameras issue more fines, police detections are far more
-              likely to result in serious legal consequences like charges and
-              arrests.
-            </p>
-
-            <div class="key-insight">
-              <h3>Quality vs Quantity</h3>
-              <p>
-                In NSW Major Cities (2024), police issued
-                <strong>79 charges</strong> to drivers aged 17-25—a metric
-                rarely seen with camera-based enforcement.
-              </p>
-            </div>
-
-            <div class="controls-panel">
-              <label for="severity-year">Year:</label>
-              <select id="severity-year">
-                <option value="2024">2024</option>
-                <option value="2023">2023</option>
-              </select>
-
-              <div class="scale-toggle">
-                <label>
-                  <input type="checkbox" id="log-scale" /> Use logarithmic scale
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div class="viz-container">
-            <div id="severity-chart"></div>
-            <div class="chart-annotation">
-              <p>
-                <strong>Reading the bubble chart:</strong> Each bubble
-                represents a jurisdiction/age group combination. Position shows
-                fines (x-axis) vs charges (y-axis). Size represents arrests.
-                Color indicates detection method.
+                <strong>Reading the chart:</strong> Each bar represents one
+                calendar year. The
+                <span style="color: #00d4ff; font-weight: 600"
+                  >blue (Police)</span
+                >
+                segment shows manually issued fines; the
+                <span style="color: #ff6348; font-weight: 600"
+                  >orange (Camera)</span
+                >
+                segment shows automated detections. Hover any bar segment for
+                the exact count.
               </p>
             </div>
           </div>
