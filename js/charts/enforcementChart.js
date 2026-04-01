@@ -5,7 +5,7 @@
 // ===========================
 
 import { config } from '../modules/config.js';
-import { filterData, aggregateData } from '../utils/dataLoader.js';
+import { getYearlyTrendsByMethod } from '../utils/dataLoader.js';
 import { formatNumber, getChartDimensions } from '../utils/helpers.js';
 import { showTooltip, hideTooltip } from '../utils/tooltip.js';
 
@@ -36,13 +36,10 @@ function renderDivergingChart(containerId, maxYear) {
     d3.select(`#${containerId}`).selectAll('*').remove();
 
     // ── Data preparation ──────────────────────────────────────────────────────
-    const filtered = filterData({
-        yearRange: [2008, maxYear],
-        location: 'General',
-        ageGroup: '0-65+'
-    });
-
-    const aggregated = aggregateData(filtered, ['year', 'detectionMethod']);
+    // Use getYearlyTrendsByMethod which aggregates across ALL locations and
+    // handles the 2023/2024 structural change (individual age rows replacing
+    // the single '0-65+' aggregate row) without double-counting.
+    const aggregated = getYearlyTrendsByMethod([2008, maxYear]);
 
     const years = d3.range(2008, maxYear + 1);
     const rowData = years.map(year => {
@@ -297,28 +294,7 @@ function renderDivergingChart(containerId, maxYear) {
         .style('fill', config.colors.camera)
         .text('Camera →');
 
-    // ── Bottom: total fines axis ──────────────────────────────────────────────
-    // Show absolute totals as a secondary reference below the chart
-    const maxTotal = d3.max(rowData, d => d.total) || 1;
-    const absScale = d3.scaleLinear().domain([0, maxTotal]).range([0, halfW]);
-
-    const absY = lastRowY + 16;
-
-    g.append('text')
-        .attr('x', 0)
-        .attr('y', absY - 4)
-        .attr('text-anchor', 'middle')
-        .style('font-size', '10px')
-        .style('fill', 'var(--text-secondary)')
-        .text('Total fines (all methods combined)');
-
-    // Total bar (right of centre, neutral colour)
-    g.selectAll('.bar-total')
-        .data(rowData)
-        .join('rect')
-        .attr('class', 'bar-total')
-        .style('display', 'none'); // hidden; kept for potential tooltip use
-
+    // ── Bottom: total fines reference ────────────────────────────────────────
     // Simple text totals to the right of camera bars
     g.selectAll('.total-label')
         .data(rowData)

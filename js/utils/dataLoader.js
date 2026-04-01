@@ -133,7 +133,7 @@ export function aggregateData(data, groupKeys) {
 }
 
 /**
- * Get yearly trends for jurisdictions.
+ * Get yearly trends for jurisdictions across ALL locations.
  *
  * The dataset has two structural eras:
  *
@@ -141,19 +141,10 @@ export function aggregateData(data, groupKeys) {
  *              location = 'General' and ageGroup = '0-65+' (aggregate).
  *
  *   2023-2024: most jurisdictions switched to individual age-group rows
- *              (17-25, 26-39, 40-64, etc.) and some changed location too
- *              (ACT moved to 'Major Cities of Australia'; NSW/VIC/SA added
- *              multiple locations). Some also kept a residual '0-65+' row
- *              alongside individual rows (NSW Camera, QLD 2024) -- summing
- *              both would double-count.
- *
- * Affected jurisdictions whose lines stopped early with the old filter:
- *   ACT  -- stops at 2022 (switched location AND age group in 2023)
- *   NT   -- stops at 2022 (switched to individual age groups in 2023)
- *   QLD  -- stops at 2023 (switched to individual age groups in 2024)
- *   SA   -- stops at 2022 (switched to individual age groups in 2023)
- *   TAS  -- stops at 2022 (switched to individual age groups in 2023)
- *   WA   -- stops at 2022 (switched to individual age groups in 2023)
+ *              (17-25, 26-39, 40-64, etc.) and multiple location types
+ *              (Major Cities, Inner Regional, etc.). Some kept a residual
+ *              '0-65+' row alongside individual rows — summing both would
+ *              double-count.
  *
  * Strategy per (jurisdiction, year):
  *   1. Collect ALL rows for that jurisdiction+year (no location or age filter).
@@ -162,30 +153,48 @@ export function aggregateData(data, groupKeys) {
  *         residual aggregate rows that some jurisdictions keep alongside)
  *   3. Otherwise -> sum the aggregate '0-65+' rows as before.
  *
- * This gives correct, continuous totals for every jurisdiction across all
- * 17 years without any hard-coded list of affected states.
- *
  * @param {string[]} jurisdictions
  * @returns {Array} rows: { jurisdiction, year, fines, arrests, charges }
  */
 export function getYearlyTrends(jurisdictions) {
     const AGGREGATE_AGE_LABELS = ['0-65+', 'All ages'];
 
-    // Pull everything for the requested jurisdictions -- no location or age filter
+    // Pull everything for the requested jurisdictions — no location or age filter
     const allRows = filterData({ jurisdictions });
+
+    /**
+     * For a set of rows belonging to one jurisdiction+year, return only the
+     * rows that should be summed — avoiding double-counting when both aggregate
+     * ('0-65+') and individual age-group rows coexist.
+     *
+     * Critically, the check is done PER DETECTION METHOD because some
+     * jurisdictions report cameras only as '0-65+' while police rows are
+     * broken out by age group (e.g. NSW 2023). A global hasIndividual check
+     * would see the police individual rows, set hasIndividual=true, then
+     * discard the camera '0-65+' rows — zeroing out all camera fines.
+     *
+     * Fix: for each method independently —
+     *   • if it has individual-age rows  → use those (drop its aggregate rows)
+     *   • if it only has aggregate rows  → keep them as-is
+     */
+    function deduplicateRows(rows) {
+        const methods = [...new Set(rows.map(d => d.detectionMethod))];
+        return methods.flatMap(method => {
+            const methodRows = rows.filter(d => d.detectionMethod === method);
+            const hasIndividual = methodRows.some(
+                d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup)
+            );
+            return hasIndividual
+                ? methodRows.filter(d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup))
+                : methodRows;
+        });
+    }
 
     // Group by jurisdiction then year
     const byJurYear = d3.rollups(
         allRows,
         rows => {
-            // Check whether this jurisdiction+year has individual age-group rows
-            const hasIndividual = rows.some(
-                d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup)
-            );
-            // Use individual rows if available (excludes aggregate to prevent double-count)
-            const relevant = hasIndividual
-                ? rows.filter(d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup))
-                : rows;
+            const relevant = deduplicateRows(rows);
             return {
                 fines:   d3.sum(relevant, d => d.fines),
                 arrests: d3.sum(relevant, d => d.arrests),
@@ -203,6 +212,75 @@ export function getYearlyTrends(jurisdictions) {
 }
 
 /**
+ * Get yearly totals split by detection method (Police / Camera) across ALL
+ * locations and jurisdictions. Uses the same double-count-safe logic as
+ * getYearlyTrends — i.e. when individual age-group rows exist for a
+ * year+detectionMethod combination, only those rows are summed (not the
+ * residual '0-65+' aggregate rows).
+ *
+ * Used by the enforcement (Man vs Machine) chart so it reflects true national
+ * totals in 2023/2024 rather than only the 'General' location subset.
+ *
+ * @param {number[]} yearRange - [minYear, maxYear] inclusive
+ * @returns {Array} rows: { year, detectionMethod, fines, arrests, charges }
+ */
+export function getYearlyTrendsByMethod(yearRange) {
+    const AGGREGATE_AGE_LABELS = ['0-65+', 'All ages'];
+
+    const allRows = filterData({ yearRange });
+
+    // CRITICAL: deduplication must happen at the (jurisdiction, detectionMethod) level,
+    // NOT globally across all jurisdictions.
+    //
+    // Bug this fixes: if we grouped by (year, detectionMethod) first and then deduped,
+    // NSW Camera 2024 has only a '0-65+' row (147,272 fines). When pooled nationally,
+    // QLD/VIC/ACT Camera rows include individual ages, making hasIndividual=true for the
+    // whole national Camera pool — which then drops NSW's '0-65+' row, erasing 147K fines.
+    //
+    // Correct approach:
+    //   1. Group by year -> jurisdiction -> detectionMethod
+    //   2. Within each (jur, method): if individual age rows exist use those, else keep aggregate
+    //   3. Re-sum across jurisdictions by (year, detectionMethod)
+
+    const byYearJurMethod = d3.rollups(
+        allRows,
+        rows => {
+            const hasIndividual = rows.some(
+                d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup)
+            );
+            const relevant = hasIndividual
+                ? rows.filter(d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup))
+                : rows;
+            return {
+                fines:   d3.sum(relevant, d => d.fines),
+                arrests: d3.sum(relevant, d => d.arrests),
+                charges: d3.sum(relevant, d => d.charges),
+            };
+        },
+        d => d.year,
+        d => d.jurisdiction,
+        d => d.detectionMethod
+    );
+
+    // Flatten and re-aggregate by (year, detectionMethod) across all jurisdictions
+    const methodTotals = new Map();
+    byYearJurMethod.forEach(([year, jurs]) => {
+        jurs.forEach(([, methods]) => {
+            methods.forEach(([detectionMethod, vals]) => {
+                const key = `${year}|${detectionMethod}`;
+                const existing = methodTotals.get(key) || { year, detectionMethod, fines: 0, arrests: 0, charges: 0 };
+                existing.fines   += vals.fines;
+                existing.arrests += vals.arrests;
+                existing.charges += vals.charges;
+                methodTotals.set(key, existing);
+            });
+        });
+    });
+
+    return [...methodTotals.values()];
+}
+
+/**
  * Get detection method comparison
  */
 export function getDetectionMethodComparison(year) {
@@ -216,27 +294,9 @@ export function getDetectionMethodComparison(year) {
 /**
  * Get demographic breakdown for a jurisdiction and year.
  *
- * Location structure varies widely across jurisdictions and years:
- *
- *   Jurisdiction | 2023 locations              | 2024 locations
- *   -------------|-----------------------------|---------------------------------
- *   ACT          | Major Cities only           | Major Cities only
- *   NSW          | General + Major Cities + …  | General + Major Cities + …
- *   NT           | General only                | General only
- *   QLD          | General only (0-65+ only!)  | General only (full age groups)
- *   SA           | General only                | General + Major Cities + …
- *   TAS          | General only                | General only
- *   VIC          | General + Major Cities + …  | General + Major Cities + …
- *   WA           | General only                | General only
- *
- * Critically, for VIC (and sometimes NSW), Police detections are recorded
- * under "General" while Camera detections are recorded under "Major Cities"
- * or other locations — so filtering to any single location would hide one
- * of the two detection-method bars entirely.
- *
- * Solution: always aggregate across ALL locations for the given jurisdiction
- * and year. This ensures both Police and Camera bars are always visible
- * regardless of how the source data distributes records across locations.
+ * Always aggregates across ALL locations for the given jurisdiction and year
+ * so that both Police and Camera bars are always visible regardless of how
+ * the source data distributes records across locations.
  *
  * '0-65+' is intentionally kept so it appears as its own bar.
  * Only the synthetic label 'All ages' is excluded.
