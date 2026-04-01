@@ -134,14 +134,72 @@ export function aggregateData(data, groupKeys) {
 
 /**
  * Get yearly trends for jurisdictions.
+ *
+ * The dataset has two structural eras:
+ *
+ *   2008-2022: every jurisdiction reports a single row per year with
+ *              location = 'General' and ageGroup = '0-65+' (aggregate).
+ *
+ *   2023-2024: most jurisdictions switched to individual age-group rows
+ *              (17-25, 26-39, 40-64, etc.) and some changed location too
+ *              (ACT moved to 'Major Cities of Australia'; NSW/VIC/SA added
+ *              multiple locations). Some also kept a residual '0-65+' row
+ *              alongside individual rows (NSW Camera, QLD 2024) -- summing
+ *              both would double-count.
+ *
+ * Affected jurisdictions whose lines stopped early with the old filter:
+ *   ACT  -- stops at 2022 (switched location AND age group in 2023)
+ *   NT   -- stops at 2022 (switched to individual age groups in 2023)
+ *   QLD  -- stops at 2023 (switched to individual age groups in 2024)
+ *   SA   -- stops at 2022 (switched to individual age groups in 2023)
+ *   TAS  -- stops at 2022 (switched to individual age groups in 2023)
+ *   WA   -- stops at 2022 (switched to individual age groups in 2023)
+ *
+ * Strategy per (jurisdiction, year):
+ *   1. Collect ALL rows for that jurisdiction+year (no location or age filter).
+ *   2. If ANY row has a specific age group (not '0-65+' / 'All ages')
+ *      -> sum only those specific-age rows  (avoids double-counting the
+ *         residual aggregate rows that some jurisdictions keep alongside)
+ *   3. Otherwise -> sum the aggregate '0-65+' rows as before.
+ *
+ * This gives correct, continuous totals for every jurisdiction across all
+ * 17 years without any hard-coded list of affected states.
+ *
+ * @param {string[]} jurisdictions
+ * @returns {Array} rows: { jurisdiction, year, fines, arrests, charges }
  */
 export function getYearlyTrends(jurisdictions) {
-    const filtered = filterData({
-        jurisdictions,
-        location: config.dataFilters.generalLocation,
-        ageGroup: config.dataFilters.allAges
-    });
-    return aggregateData(filtered, ['jurisdiction', 'year']);
+    const AGGREGATE_AGE_LABELS = ['0-65+', 'All ages'];
+
+    // Pull everything for the requested jurisdictions -- no location or age filter
+    const allRows = filterData({ jurisdictions });
+
+    // Group by jurisdiction then year
+    const byJurYear = d3.rollups(
+        allRows,
+        rows => {
+            // Check whether this jurisdiction+year has individual age-group rows
+            const hasIndividual = rows.some(
+                d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup)
+            );
+            // Use individual rows if available (excludes aggregate to prevent double-count)
+            const relevant = hasIndividual
+                ? rows.filter(d => !AGGREGATE_AGE_LABELS.includes(d.ageGroup))
+                : rows;
+            return {
+                fines:   d3.sum(relevant, d => d.fines),
+                arrests: d3.sum(relevant, d => d.arrests),
+                charges: d3.sum(relevant, d => d.charges),
+            };
+        },
+        d => d.jurisdiction,
+        d => d.year
+    );
+
+    // Flatten nested rollup [[jur, [[year, vals], ...]], ...] -> flat array
+    return byJurYear.flatMap(([jurisdiction, years]) =>
+        years.map(([year, vals]) => ({ jurisdiction, year, ...vals }))
+    );
 }
 
 /**
