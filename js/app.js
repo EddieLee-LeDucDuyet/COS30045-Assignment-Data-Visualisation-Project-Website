@@ -66,14 +66,16 @@ function renderSection(sectionId) {
             break;
 
         case 'demographics':
-            import('./charts/demographicsChart.js').then(({ createDemographicsChart }) => {
-                createDemographicsChart();
+            // bubbleChart.js — was demographicsChart.js (grouped bar chart → bubble chart)
+            import('./charts/bubbleChart.js').then(({ createBubbleChart }) => {
+                createBubbleChart();
             });
             break;
 
         case 'fines':
-            import('./charts/fineshistogram.js').then(({ createFinesHistogram }) => {
-                createFinesHistogram();
+            // heatmapChart.js — was fineshistogram.js (histogram → heatmap)
+            import('./charts/heatmapChart.js').then(({ createHeatmapChart }) => {
+                createHeatmapChart();
             });
             break;
     }

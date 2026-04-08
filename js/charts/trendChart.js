@@ -6,7 +6,7 @@ import { config, jurisdictionNames } from '../modules/config.js';
 import { getYearlyTrends, filterData } from '../utils/dataLoader.js';
 import { formatNumber, getChartDimensions } from '../utils/helpers.js';
 import { showTooltip, hideTooltip } from '../utils/tooltip.js';
-import { renderStory, ensureStoryPanel, getTrendStory } from './storyTelling.js';
+import { renderStory, ensureStoryPanel, getTrendStory, getDataNotes } from './storyTelling.js';
 
 let selectedJurisdictions = new Set(['NSW', 'VIC', 'QLD']);
 let selectedMethods = new Set(['Police', 'Camera']);
@@ -26,7 +26,6 @@ function initializeMethodControls() {
     const panel = document.querySelector('#trend .controls-panel');
     if (!panel) return;
 
-    // ── Method pills row ──────────────────────────────────────────────────────
     const wrapper = document.createElement('div');
     wrapper.id = 'method-filter-controls';
     wrapper.style.cssText = 'margin-bottom: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;';
@@ -85,7 +84,6 @@ function initializeControls(controlsId) {
     const controlsContainer = d3.select('#' + controlsId);
     controlsContainer.selectAll('*').remove();
 
-    // ── Select All / Clear All ────────────────────────────────────────────────
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;';
 
@@ -141,9 +139,18 @@ function updateTrendChart(containerId) {
 
     d3.select('#' + containerId).selectAll('*').remove();
 
-    // Update story
-    const jurArr = [...selectedJurisdictions];
-    renderStory('trend-story-panel', getTrendStory(jurArr));
+    const jurArr        = [...selectedJurisdictions];
+    const activeMethods = [...selectedMethods];
+
+    // ── Story + data notes ────────────────────────────────────────────────
+    // For multi-jurisdiction selections use notes from the first selected;
+    // for single selections use that jurisdiction's specific notes.
+    const notesJur = jurArr.length === 1 ? jurArr[0] : null;
+    renderStory(
+        'trend-story-panel',
+        getTrendStory(jurArr),
+        notesJur ? getDataNotes(notesJur, activeMethods) : getMethodNotes(activeMethods)
+    );
 
     if (selectedJurisdictions.size === 0) {
         d3.select('#' + containerId).append('p').attr('class', 'empty-state')
@@ -174,8 +181,6 @@ function updateTrendChart(containerId) {
         .attr('text-anchor', 'middle').style('font-size', '12px').style('fill', 'var(--text-secondary)')
         .text('Showing: ' + methodLabel);
 
-    // Use only years that actually have data — prevents duplicate ticks when
-    // Camera-only is selected and the pre-2020 years are absent.
     const presentYears = [...new Set(trendData.map(d => d.year))].sort((a, b) => a - b);
     const xScale = d3.scalePoint().domain(presentYears).range([0, dims.innerWidth]).padding(0.3);
     const yScale = d3.scaleLinear().domain([0, d3.max(trendData, d => d.fines) || 1]).nice().range([dims.innerHeight, 0]);
@@ -251,6 +256,23 @@ function updateTrendChart(containerId) {
             .style('background-color', config.colors.jurisdictions[d.jurisdiction]).style('flex-shrink', '0');
         item.append('span').style('font-size', '13px').style('color', 'var(--text-primary)').text(d.jurisdiction);
     });
+}
+
+// Return method-level notes when multiple jurisdictions are selected
+function getMethodNotes(activeMethods) {
+    const METHOD_NOTES = {
+        Camera: [
+            '📷 Camera fines are detected automatically the driver is not stopped. Detection method varies by state (fixed, mobile, average speed, red-light).',
+            '⚠️ Not all states report camera fines publicly NSW camera fines are collected by NSW Revenue, not NSW Police.',
+        ],
+        Police: [
+            '👮 Police-issued fines require an officer to stop the vehicle. Volumes have declined nationally since 2012 as camera enforcement expanded.',
+            '🔢 Arrests are generally not applicable for NSW and Tasmania blank values mean the measure does not apply.',
+        ],
+    };
+    const notes = [];
+    activeMethods.forEach(m => { if (METHOD_NOTES[m]) notes.push(...METHOD_NOTES[m]); });
+    return notes;
 }
 
 export function getSelectedJurisdictions() { return new Set(selectedJurisdictions); }
