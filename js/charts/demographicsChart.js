@@ -18,12 +18,137 @@ const FULL_AGE_ORDER = (() => {
 const INSIDE_LABEL_MIN_PX = 20;
 const MIN_VALUE_FOR_LABEL  = 1;
 
+// Module-level state
+let showAggregate = false;
+let selectedMethods = new Set(['Police', 'Camera']);
+
 export function createDemographicsChart() {
     const jurisdictionSelect = document.getElementById('demo-jurisdiction');
     const yearSelect         = document.getElementById('demo-year');
+
+    injectAggregateToggle();
+    injectMethodFilter();
+
     jurisdictionSelect.addEventListener('change', updateChart);
     yearSelect.addEventListener('change', updateChart);
     updateChart();
+}
+
+function injectAggregateToggle() {
+    if (document.getElementById('aggregate-toggle-wrapper')) return;
+
+    const panel = document.querySelector('#demographics .controls-panel');
+    if (!panel) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'aggregate-toggle-wrapper';
+    wrapper.style.cssText = 'margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;';
+
+    const heading = document.createElement('span');
+    heading.textContent = 'Age group filter:';
+    heading.style.cssText = 'font-size: 0.9rem; font-weight: 600; color: var(--text-primary); white-space: nowrap;';
+    wrapper.appendChild(heading);
+
+    const label = document.createElement('label');
+    label.style.cssText = `
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 14px; border-radius: 20px; cursor: pointer;
+        font-size: 0.85rem; font-weight: 600; user-select: none;
+        border: 2px solid var(--text-secondary);
+        background-color: transparent;
+        color: var(--text-secondary);
+        transition: background-color 0.2s, color 0.2s;
+    `;
+    label.title = 'Include the 0-65+ aggregate row (may overlap with age-specific bars)';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = showAggregate;
+    checkbox.style.display = 'none';
+
+    const applyStyle = (checked) => {
+        label.style.backgroundColor = checked ? 'var(--secondary-color)' : 'transparent';
+        label.style.borderColor     = checked ? 'var(--secondary-color)' : 'var(--text-secondary)';
+        label.style.color           = checked ? '#fff' : 'var(--text-secondary)';
+    };
+    applyStyle(checkbox.checked);
+
+    checkbox.addEventListener('change', () => {
+        showAggregate = checkbox.checked;
+        applyStyle(checkbox.checked);
+        updateChart();
+    });
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode('Show 0-65+ aggregate bar'));
+    wrapper.appendChild(label);
+    panel.appendChild(wrapper);
+}
+
+function injectMethodFilter() {
+    if (document.getElementById('demo-method-filter-wrapper')) return;
+
+    const panel = document.querySelector('#demographics .controls-panel');
+    if (!panel) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'demo-method-filter-wrapper';
+    wrapper.style.cssText = 'margin-top: 0.75rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;';
+
+    const heading = document.createElement('span');
+    heading.textContent = 'Detection method:';
+    heading.style.cssText = 'font-size: 0.9rem; font-weight: 600; color: var(--text-primary); white-space: nowrap;';
+    wrapper.appendChild(heading);
+
+    const pillRow = document.createElement('div');
+    pillRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem;';
+    wrapper.appendChild(pillRow);
+
+    const methods = [
+        { key: 'Police', color: 'var(--police-color)', icon: '👮' },
+        { key: 'Camera', color: 'var(--camera-color)', icon: '📷' },
+    ];
+
+    methods.forEach(({ key, color, icon }) => {
+        const label = document.createElement('label');
+        label.style.cssText = `
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 20px; cursor: pointer;
+            font-size: 0.85rem; font-weight: 600; user-select: none;
+            border: 2px solid ${color};
+            background-color: ${color};
+            color: #fff;
+            transition: background-color 0.2s, color 0.2s;
+        `;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = selectedMethods.has(key);
+        checkbox.style.display = 'none';
+
+        const applyStyle = (checked) => {
+            label.style.backgroundColor = checked ? color : 'transparent';
+            label.style.color           = checked ? '#fff' : color;
+        };
+        applyStyle(checkbox.checked);
+
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                selectedMethods.add(key);
+            } else {
+                if (selectedMethods.size === 1) { checkbox.checked = true; return; }
+                selectedMethods.delete(key);
+            }
+            applyStyle(checkbox.checked);
+            updateChart();
+        });
+
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(icon + ' ' + key));
+        pillRow.appendChild(label);
+    });
+
+    panel.appendChild(wrapper);
 }
 
 function updateChart() {
@@ -33,9 +158,13 @@ function updateChart() {
 
     d3.select('#demographics-chart').selectAll('*').remove();
 
-    const rawRows = getDemographicBreakdown(jurisdiction, year);
+    const rawRows = getDemographicBreakdown(jurisdiction, year, showAggregate);
 
-    if (rawRows.length === 0) {
+    // Apply detection method filter
+    const activeMethods = [...selectedMethods];
+    const filteredRows = rawRows.filter(d => activeMethods.includes(d.detectionMethod));
+
+    if (filteredRows.length === 0) {
         d3.select('#demographics-chart')
             .append('p')
             .style('text-align', 'center').style('padding', '50px')
@@ -45,7 +174,7 @@ function updateChart() {
     }
 
     // Group by ageGroup, then split by method
-    const grouped = d3.group(rawRows, d => d.ageGroup);
+    const grouped = d3.group(filteredRows, d => d.ageGroup);
     const barData = Array.from(grouped, ([ageGroup, values]) => {
         const policeRow = values.find(v => v.detectionMethod === 'Police');
         const cameraRow = values.find(v => v.detectionMethod === 'Camera');
@@ -66,8 +195,8 @@ function updateChart() {
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
 
-    const hasPolice = barData.some(d => d.Police > 0);
-    const hasCamera = barData.some(d => d.Camera > 0);
+    const hasPolice = activeMethods.includes('Police') && barData.some(d => d.Police > 0);
+    const hasCamera = activeMethods.includes('Camera') && barData.some(d => d.Camera > 0);
     const methods   = ['Police', 'Camera'].filter(m => m === 'Police' ? hasPolice : hasCamera);
 
     const hasAnyCharges = barData.some(d => d.PoliceCharges + d.CameraCharges > 0);
@@ -81,7 +210,6 @@ function updateChart() {
     const containerW  = container.clientWidth || 900;
     const innerWidth  = containerW - margin.left - margin.right;
 
-    // Scales shared between both charts
     const x0 = d3.scaleBand()
         .domain(barData.map(d => d.ageGroup))
         .range([0, innerWidth])
@@ -111,25 +239,21 @@ function updateChart() {
     const g1 = svg1.append('g')
         .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-    // Subtitle
     g1.append('text')
         .attr('x', innerWidth / 2).attr('y', -38)
         .attr('text-anchor', 'middle')
         .style('font-size', '12px').style('fill', 'var(--text-secondary)')
         .text(jurisdiction + ' ' + year + '  \u00b7  ' + locationLabel);
 
-    // Chart title
     g1.append('text')
         .attr('x', innerWidth / 2).attr('y', -20)
         .attr('text-anchor', 'middle')
         .style('font-size', '14px').style('font-weight', '700').style('fill', 'var(--text-primary)')
         .text('Fines by Age Group');
 
-    // Grid
     g1.append('g').attr('class', 'grid').attr('opacity', 0.08)
         .call(d3.axisLeft(yFines).tickSize(-innerWidth).tickFormat(''));
 
-    // X axis
     g1.append('g').attr('class', 'axis')
         .attr('transform', 'translate(0,' + finesInnerH + ')')
         .call(d3.axisBottom(x0))
@@ -141,7 +265,6 @@ function updateChart() {
         .style('font-size', '13px').style('font-weight', '600').style('fill', 'currentColor')
         .text('Age Group');
 
-    // Y axis
     g1.append('g').attr('class', 'axis').call(d3.axisLeft(yFines).tickFormat(formatNumber));
     g1.append('text')
         .attr('transform', 'rotate(-90)')
@@ -150,7 +273,6 @@ function updateChart() {
         .style('font-size', '13px').style('font-weight', '600').style('fill', 'currentColor')
         .text('Number of Fines');
 
-    // Bar groups
     const ageGroups1 = g1.selectAll('.age-group')
         .data(barData).join('g').attr('class', 'age-group')
         .attr('transform', d => 'translate(' + x0(d.ageGroup) + ',0)');
@@ -174,7 +296,6 @@ function updateChart() {
         })
         .on('mouseout', function () { d3.select(this).attr('opacity', 1); hideTooltip(); });
 
-    // Value labels
     ageGroups1.selectAll('.bar-label')
         .data(d => methods.map(method => ({ method, value: d[method], ageGroup: d.ageGroup })))
         .join('text').attr('class', 'bar-label')
@@ -194,16 +315,13 @@ function updateChart() {
         .text(d => d.value >= MIN_VALUE_FOR_LABEL ? formatNumber(d.value) : '');
 
     // ═════════════════════════════════════════════════════════════════════════
-    // CHART 2 — Charges & Arrests (only if data exists)
+    // CHART 2 — Charges & Arrests
     // ═════════════════════════════════════════════════════════════════════════
     if (showSecondary) {
-        // Metric rows: charges and arrests
         const metrics = [];
         if (hasAnyCharges) metrics.push({ key: 'Charges', polKey: 'PoliceCharges', camKey: 'CameraCharges', color: '#ffa502', label: 'Charges' });
         if (hasAnyArrests) metrics.push({ key: 'Arrests', polKey: 'PoliceArrests', camKey: 'CameraArrests', color: '#ff6b9d', label: 'Arrests' });
 
-        // Interleave methods within each metric as sub-bars
-        // x1 for secondary uses same x0 bands but groups: [PoliceCharges, CameraCharges, PoliceArrests, CameraArrests]
         const secKeys = [];
         metrics.forEach(m => {
             if (hasPolice) secKeys.push({ key: m.polKey, method: 'Police', metric: m.key, color: config.colors.police, label: 'Police ' + m.label });
@@ -216,7 +334,6 @@ function updateChart() {
             .padding(0.06);
 
         const ySecMax = d3.max(barData, d => d3.max(secKeys, k => d[k.key])) || 1;
-
         const secHeight  = Math.max(220, Math.min(300, containerW * 0.27));
         const secMarginT = 50;
         const secInnerH  = secHeight - secMarginT - margin.bottom;
@@ -233,18 +350,15 @@ function updateChart() {
         const g2 = svg2.append('g')
             .attr('transform', 'translate(' + margin.left + ',' + secMarginT + ')');
 
-        // Chart title
         g2.append('text')
             .attr('x', innerWidth / 2).attr('y', -28)
             .attr('text-anchor', 'middle')
             .style('font-size', '14px').style('font-weight', '700').style('fill', 'var(--text-primary)')
             .text('Charges & Arrests by Age Group');
 
-        // Grid
         g2.append('g').attr('class', 'grid').attr('opacity', 0.08)
             .call(d3.axisLeft(ySec).tickSize(-innerWidth).tickFormat(''));
 
-        // X axis
         g2.append('g').attr('class', 'axis')
             .attr('transform', 'translate(0,' + secInnerH + ')')
             .call(d3.axisBottom(x0))
@@ -256,7 +370,6 @@ function updateChart() {
             .style('font-size', '13px').style('font-weight', '600').style('fill', 'currentColor')
             .text('Age Group');
 
-        // Y axis
         g2.append('g').attr('class', 'axis').call(d3.axisLeft(ySec).ticks(5).tickFormat(formatNumber));
         g2.append('text')
             .attr('transform', 'rotate(-90)')
@@ -265,7 +378,6 @@ function updateChart() {
             .style('font-size', '13px').style('font-weight', '600').style('fill', 'currentColor')
             .text('Count');
 
-        // Bar groups
         const ageGroups2 = g2.selectAll('.age-group-sec')
             .data(barData).join('g').attr('class', 'age-group-sec')
             .attr('transform', d => 'translate(' + x0(d.ageGroup) + ',0)');
@@ -286,7 +398,6 @@ function updateChart() {
             })
             .on('mouseout', function () { d3.select(this).attr('opacity', 0.85); hideTooltip(); });
 
-        // Value labels on secondary chart
         ageGroups2.selectAll('.sec-label')
             .data(d => secKeys.map(k => ({ key: k.key, value: d[k.key], label: k.label, ageGroup: d.ageGroup })))
             .join('text').attr('class', 'sec-label')

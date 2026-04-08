@@ -3,6 +3,7 @@
 // Diverging stacked bar chart — Police (left) vs Camera (right)
 // Each row = one year; bars grow from a shared centre axis.
 // Right side shows Total fines | Charges | Arrests columns.
+// Only shows years from 2020 onwards (camera era).
 // ===========================
 
 import { config } from '../modules/config.js';
@@ -10,26 +11,20 @@ import { getYearlyTrendsByMethod } from '../utils/dataLoader.js';
 import { formatNumber, getChartDimensions } from '../utils/helpers.js';
 import { showTooltip, hideTooltip } from '../utils/tooltip.js';
 
-export function createEnforcementChart(containerId = 'enforcement-chart', sliderId = 'year-slider') {
-    const slider  = document.getElementById(sliderId);
-    const display = document.getElementById('year-display');
+const CAMERA_START_YEAR = 2020;
 
-    slider.addEventListener('input', function () {
-        display.textContent = this.value;
-        renderDivergingChart(containerId, +this.value);
-    });
-
-    renderDivergingChart(containerId, +slider.value);
+export function createEnforcementChart(containerId = 'enforcement-chart') {
+    renderDivergingChart(containerId);
 }
 
-function renderDivergingChart(containerId, maxYear) {
+function renderDivergingChart(containerId) {
     const container = document.getElementById(containerId);
     d3.select('#' + containerId).selectAll('*').remove();
 
-    // Data
-    const aggregated = getYearlyTrendsByMethod([2008, maxYear]);
+    // Data — only camera era
+    const aggregated = getYearlyTrendsByMethod([CAMERA_START_YEAR, 2024]);
 
-    const years = d3.range(2008, maxYear + 1);
+    const years = d3.range(CAMERA_START_YEAR, 2025);
     const rowData = years.map(year => {
         const policeRow = aggregated.find(d => d.year === year && d.detectionMethod === 'Police');
         const cameraRow = aggregated.find(d => d.year === year && d.detectionMethod === 'Camera');
@@ -51,8 +46,8 @@ function renderDivergingChart(containerId, maxYear) {
     });
 
     // Layout
-    const ROW_H      = 36;
-    const ROW_PAD    = 6;
+    const ROW_H      = 42;
+    const ROW_PAD    = 8;
     const marginTop  = 72;
     const marginBot  = 40;
     const marginL    = 52;
@@ -141,7 +136,7 @@ function renderDivergingChart(containerId, maxYear) {
         .attr('x', 0).attr('y', (d, i) => i * (ROW_H + ROW_PAD) + ROW_H / 2 + 1)
         .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
         .style('font-size', '11px').style('font-weight', '700')
-        .style('fill', d => d.year === 2020 ? '#ff6b9d' : 'var(--text-secondary)')
+        .style('fill', 'var(--text-secondary)')
         .text(d => d.year);
 
     // % labels inside bars
@@ -166,22 +161,6 @@ function renderDivergingChart(containerId, maxYear) {
         .style('font-size', '10px').style('font-weight', '600')
         .style('fill', 'white').style('pointer-events', 'none')
         .text(d => (d.policePct * 100).toFixed(0) + '%');
-
-    // Camera intro annotation
-    const introIdx = rowData.findIndex(d => d.year === 2020);
-    if (introIdx >= 0) {
-        const annoY = introIdx * (ROW_H + ROW_PAD) - 10;
-        g.append('line')
-            .attr('x1', -halfW - innerLabelW / 2 + 8).attr('x2', halfW + innerLabelW / 2 - 8)
-            .attr('y1', annoY).attr('y2', annoY)
-            .attr('stroke', '#ff6b9d').attr('stroke-width', 1)
-            .attr('stroke-dasharray', '4,3').attr('opacity', 0.7);
-        g.append('text')
-            .attr('x', halfW + innerLabelW / 2 - 10).attr('y', annoY - 4)
-            .attr('text-anchor', 'end')
-            .style('font-size', '10px').style('font-weight', '600').style('fill', '#ff6b9d')
-            .text('\u25b2 Camera detection introduced');
-    }
 
     // Top axis ticks
     const topY = -40;
@@ -260,7 +239,6 @@ function renderDivergingChart(containerId, maxYear) {
             .style('font-size', '10px')
             .style('font-weight', d => d[col.key] > 0 ? '600' : '400')
             .style('fill', d => d[col.key] > 0 ? col.color : 'var(--border-color)')
-            .style('cursor', d => d[col.key] > 0 ? 'default' : 'default')
             .text(d => d[col.key] > 0 ? formatNumber(d[col.key]) : '\u2014')
             .on('mouseover', function (event, d) {
                 if (d[col.key] === 0) return;

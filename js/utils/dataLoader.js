@@ -154,13 +154,19 @@ export function aggregateData(data, groupKeys) {
  *   3. Otherwise -> sum the aggregate '0-65+' rows as before.
  *
  * @param {string[]} jurisdictions
+ * @param {string[]} [detectionMethods] - Optional filter: ['Police'], ['Camera'], or ['Police','Camera'] (default = both)
  * @returns {Array} rows: { jurisdiction, year, fines, arrests, charges }
  */
-export function getYearlyTrends(jurisdictions) {
+export function getYearlyTrends(jurisdictions, detectionMethods) {
     const AGGREGATE_AGE_LABELS = ['0-65+', 'All ages'];
 
     // Pull everything for the requested jurisdictions — no location or age filter
-    const allRows = filterData({ jurisdictions });
+    let allRows = filterData({ jurisdictions });
+
+    // Apply detection method filter if provided (and not "show both")
+    if (detectionMethods && detectionMethods.length > 0 && detectionMethods.length < 2) {
+        allRows = allRows.filter(d => detectionMethods.includes(d.detectionMethod));
+    }
 
     /**
      * For a set of rows belonging to one jurisdiction+year, return only the
@@ -216,7 +222,7 @@ export function getYearlyTrends(jurisdictions) {
  * locations and jurisdictions. Uses the same double-count-safe logic as
  * getYearlyTrends — i.e. when individual age-group rows exist for a
  * year+detectionMethod combination, only those rows are summed (not the
- * residual '0-65+' aggregate rows).
+ * residual '0-65+' aggregate rows that some jurisdictions keep alongside).
  *
  * Used by the enforcement (Man vs Machine) chart so it reflects true national
  * totals in 2023/2024 rather than only the 'General' location subset.
@@ -305,11 +311,12 @@ export function getDetectionMethodComparison(year) {
  * @param {number} year
  * @returns {Array} rows: { ageGroup, detectionMethod, fines, arrests, charges }
  */
-export function getDemographicBreakdown(jurisdiction, year) {
+export function getDemographicBreakdown(jurisdiction, year, includeAggregate = false) {
+    const exclude = includeAggregate ? ['All ages'] : ['All ages', '0-65+'];
     const data = filterData({
         jurisdiction,
         year,
-        excludeAgeGroups: ['All ages']
+        excludeAgeGroups: exclude
     });
     return aggregateData(data, ['ageGroup', 'detectionMethod']);
 }

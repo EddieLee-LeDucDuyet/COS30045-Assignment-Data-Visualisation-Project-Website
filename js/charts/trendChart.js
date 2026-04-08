@@ -9,6 +9,7 @@ import { formatNumber, getChartDimensions } from '../utils/helpers.js';
 import { showTooltip, hideTooltip } from '../utils/tooltip.js';
 
 let selectedJurisdictions = new Set(['NSW', 'VIC', 'QLD']);
+let selectedMethods = new Set(['Police', 'Camera']);
 
 /**
  * Create historical trend chart
@@ -17,7 +18,91 @@ let selectedJurisdictions = new Set(['NSW', 'VIC', 'QLD']);
  */
 export function createHistoricalTrendChart(containerId = 'trend-chart', controlsId = 'jurisdiction-controls') {
     initializeControls(controlsId);
+    initializeMethodControls();
     updateTrendChart(containerId);
+}
+
+/**
+ * Inject the detection-method toggle UI above the jurisdiction controls panel.
+ * Idempotent — will not insert twice if called more than once.
+ */
+function initializeMethodControls() {
+    // Avoid duplicating the controls if the chart is re-rendered
+    if (document.getElementById('method-filter-controls')) return;
+
+    const panel = document.querySelector('#trend .controls-panel');
+    if (!panel) return;
+
+    // Build wrapper
+    const wrapper = document.createElement('div');
+    wrapper.id = 'method-filter-controls';
+    wrapper.style.cssText = 'margin-bottom: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;';
+
+    // Label
+    const heading = document.createElement('h4');
+    heading.textContent = 'Filter by Detection Method:';
+    heading.style.cssText = 'margin: 0 0.75rem 0 0; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap;';
+    wrapper.appendChild(heading);
+
+    // Pill container
+    const pillRow = document.createElement('div');
+    pillRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem;';
+    wrapper.appendChild(pillRow);
+
+    const methods = [
+        { key: 'Police', color: 'var(--police-color)', icon: '👮' },
+        { key: 'Camera', color: 'var(--camera-color)', icon: '📷' },
+    ];
+
+    methods.forEach(({ key, color, icon }) => {
+        const label = document.createElement('label');
+        label.style.cssText = `
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 20px; cursor: pointer;
+            font-size: 0.85rem; font-weight: 600; user-select: none;
+            border: 2px solid ${color};
+            background-color: ${color};
+            color: #fff;
+            transition: background-color 0.2s, opacity 0.2s;
+        `;
+        label.title = `Toggle ${key} fines`;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = selectedMethods.has(key);
+        checkbox.style.display = 'none';
+
+        const applyStyle = (checked) => {
+            label.style.backgroundColor = checked ? color : 'transparent';
+            label.style.color = checked ? '#fff' : color;
+            label.style.opacity = '1';
+        };
+
+        applyStyle(checkbox.checked);
+
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                selectedMethods.add(key);
+            } else {
+                // Prevent deselecting both
+                if (selectedMethods.size === 1) {
+                    checkbox.checked = true;
+                    return;
+                }
+                selectedMethods.delete(key);
+            }
+            applyStyle(checkbox.checked);
+            updateTrendChart('trend-chart');
+        });
+
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(`${icon} ${key}`));
+        pillRow.appendChild(label);
+    });
+
+    // Insert before the jurisdiction heading
+    const firstH4 = panel.querySelector('h4');
+    panel.insertBefore(wrapper, firstH4);
 }
 
 /**
@@ -55,7 +140,7 @@ function initializeControls(controlsId) {
 }
 
 /**
- * Update trend chart with selected jurisdictions
+ * Update trend chart with selected jurisdictions and method filter
  * @param {string} containerId - Container element ID
  */
 function updateTrendChart(containerId) {
@@ -75,9 +160,21 @@ function updateTrendChart(containerId) {
             .text('Please select at least one jurisdiction to display');
         return;
     }
+
+    if (selectedMethods.size === 0) {
+        d3.select(`#${containerId}`)
+            .append('p')
+            .attr('class', 'empty-state')
+            .style('text-align', 'center')
+            .style('padding', '50px')
+            .style('color', '#7f8c8d')
+            .text('Please select at least one detection method to display');
+        return;
+    }
     
-    // Get trend data
-    const trendData = getYearlyTrends([...selectedJurisdictions]);
+    // Get trend data — pass active method filter
+    const methodFilter = [...selectedMethods];
+    const trendData = getYearlyTrends([...selectedJurisdictions], methodFilter);
     
     // Group by jurisdiction
     const grouped = d3.group(trendData, d => d.jurisdiction);
@@ -85,7 +182,12 @@ function updateTrendChart(containerId) {
         jurisdiction,
         values: values.sort((a, b) => a.year - b.year)
     }));
-    
+
+    // ── Method filter badge shown in chart ──────────────────────────────────
+    const methodLabel = methodFilter.length === 2
+        ? 'Police + Camera'
+        : methodFilter[0] === 'Police' ? '👮 Police only' : '📷 Camera only';
+
     // Create SVG
     const svg = d3.select(`#${containerId}`)
         .append('svg')
@@ -94,14 +196,24 @@ function updateTrendChart(containerId) {
     
     const g = svg.append('g')
         .attr('transform', `translate(${config.margin.left},${config.margin.top})`);
+
+    // Sub-title showing active filter
+    g.append('text')
+        .attr('x', dims.innerWidth / 2)
+        .attr('y', -18)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', 'var(--text-secondary)')
+        .text(`Showing: ${methodLabel}`);
     
     // Scales
     const xScale = d3.scaleLinear()
         .domain(d3.extent(trendData, d => d.year))
         .range([0, dims.innerWidth]);
     
+    const yMax = d3.max(trendData, d => d.fines) || 1;
     const yScale = d3.scaleLinear()
-        .domain([0, d3.max(trendData, d => d.fines)])
+        .domain([0, yMax])
         .nice()
         .range([dims.innerHeight, 0]);
     
